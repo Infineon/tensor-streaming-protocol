@@ -1,0 +1,28 @@
+# Board
+protocol.Board.name type:FT_POINTER
+protocol.Board.firmware_version proto3_singular_msgs:true
+protocol.Board.protocol_version proto3_singular_msgs:true
+protocol.Board.devices type:FT_POINTER
+
+# Device
+protocol.Device.name type:FT_POINTER
+protocol.Device.description type:FT_POINTER
+protocol.Device.options type:FT_POINTER
+protocol.Device.streams type:FT_POINTER
+protocol.Device.status_message type:FT_POINTER
+
+# Option
+protocol.Option.name type:FT_POINTER
+protocol.Option.description type:FT_POINTER
+
+# StreamConfig
+protocol.StreamConfig.name type:FT_POINTER
+protocol.StreamConfig.shape max_count:6
+protocol.StreamConfig.unit type:FT_POINTER
+
+# Dimension
+protocol.Dimension.name type:FT_POINTER
+protocol.Dimension.labels type:FT_POINTER
+
+# OptionOneOf
+protocol.OptionOneOf.items type:FT_POINTER type:FT_POINTER

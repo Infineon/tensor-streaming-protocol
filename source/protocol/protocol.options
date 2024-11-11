@@ -1,0 +1,29 @@
+# Request
+#protocol.Request.capabilities type:FT_POINTER
+#protocol.Request.config type:FT_POINTER
+#protocol.Request.subscribe type:FT_POINTER
+#protocol.Request.unsubscribe type:FT_POINTER
+#protocol.Request.watchdog_reset type:FT_POINTER
+#protocol.Response.data type:FT_POINTER
+protocol.Request submsg_callback:true
+
+# Response
+#protocol.Response.capabilities type:FT_POINTER
+#protocol.Response.config type:FT_POINTER
+#protocol.Response.error type:FT_POINTER
+#protocol.Response.data type:FT_POINTER
+
+
+# BoardCapabilitiesResponse
+protocol.BoardCapabilitiesResponse.board type:FT_POINTER
+
+# DeviceConfigurationRequest
+protocol.DeviceConfigurationRequest.options type:FT_POINTER
+
+# DeviceConfigurationResponse
+protocol.DeviceConfigurationResponse.options type:FT_POINTER
+protocol.DeviceConfigurationResponse.streams type:FT_POINTER
+protocol.DeviceConfigurationResponse.status_message type:FT_POINTER
+
+# ErrorResponse
+protocol.ErrorResponse.error_message type:FT_POINTER
