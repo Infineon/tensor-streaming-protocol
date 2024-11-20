@@ -31,6 +31,8 @@
 #include "pb_common.h"
 #include "pb.h"
 
+#include "pmem.h"
+
 
 /*****************************************************************************
  *                           Declarations Internal                           *
@@ -43,9 +45,7 @@ static protocol_Option* protocol_create_option(
 	const char* description)
 {
 	int option_index = device->options_count++;
-	device->options = (protocol_Option*)protocol_realloc(
-		device->options, 
-		sizeof(protocol_Option) * device->options_count);
+	device->options = pmem_realloc_Option(device->options, device->options_count);
 	if (device->options == NULL)
 		return NULL;
 	protocol_Option* option = &device->options[option_index];
@@ -67,7 +67,7 @@ static int protocol_find_option(
 	if (protocol == NULL || result == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -102,7 +102,7 @@ static bool protocol_process_capabilities_request(
 	protocol_Response response;
 	response.which_response_type = protocol_Response_capabilities_tag;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	int request_filter = request->request_type.capabilities.device;
 
@@ -144,7 +144,7 @@ static bool protocol_process_config_request(
 	int device_id = config_request->device;
 
 	// Check device_id is valid
-	if (device_id < 0 || device_id >= protocol->board->devices_count)
+	if (device_id < 0 || device_id >= protocol->board.devices_count)
 		return protocol_send_error_code(PROTOCOL_STATUS_NO_SUCH_DEVICE, ostream);
 
 	// Update model object with new config values
@@ -184,7 +184,7 @@ static bool protocol_process_config_request(
 	protocol_Response response;
 	response.which_response_type = protocol_Response_config_tag;
 	protocol_DeviceConfigurationResponse* response_msg = &response.response_type.config;
-	protocol_Device* device = &protocol->board->devices[device_id];
+	protocol_Device* device = &protocol->board.devices[device_id];
 	response_msg->device = device_id;
 	response_msg->options_count = device->options_count;
 	response_msg->options = (protocol_OptionValue *)alloca(sizeof(protocol_OptionValue) * device->options_count);
@@ -237,7 +237,7 @@ static bool protocol_process_start_request(
 	int device_id = start_request->device;
 
 	// Check device_id is valid
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 	if (device_id < 0 || device_id >= board->devices_count)
 		return protocol_send_error_code(PROTOCOL_STATUS_NO_SUCH_DEVICE, ostream);
 
@@ -245,7 +245,7 @@ static bool protocol_process_start_request(
 	protocol_device_start_fn start_fn = manager->start;
 	protocol_DeviceStatus status = board->devices[device_id].status;
 	if (start_fn != NULL
-		&& (status == protocol_DeviceStatus_Ready || status == protocol_DeviceStatus_Error)) {
+		&& (status == protocol_DeviceStatus_DEVICE_STATUS_READY || status == protocol_DeviceStatus_DEVICE_STATUS_ERROR)) {
 		start_fn(protocol, device_id, manager->arg);
 	}
 
@@ -265,7 +265,7 @@ static bool protocol_process_stop_request(
 	int device_id = stop_request->device;
 
 	// Check device_id is valid
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 	if (device_id >= board->devices_count)
 		return protocol_send_error_code(PROTOCOL_STATUS_NO_SUCH_DEVICE, ostream);
 
@@ -274,17 +274,17 @@ static bool protocol_process_stop_request(
 		protocol_device_stop_fn stop_fn = protocol->device_managers[device_id].stop;
 		protocol_DeviceStatus status = board->devices[device_id].status;
 		if (stop_fn != NULL 
-			&& (status == protocol_DeviceStatus_Active || status == protocol_DeviceStatus_ActiveWait)) {
+			&& (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT)) {
 			stop_fn(protocol, device_id, manager->arg);
 		}
 	}
 	else {
-		for (int i = 0; i < protocol->board->devices_count; i++) {
+		for (int i = 0; i < protocol->board.devices_count; i++) {
 			device_manager_t* manager = &protocol->device_managers[i];
 			protocol_device_stop_fn stop_fn = manager->stop;
 			protocol_DeviceStatus status = board->devices[i].status;
 			if (stop_fn != NULL 
-				&& (status == protocol_DeviceStatus_Active || status == protocol_DeviceStatus_ActiveWait)) {
+				&& (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT)) {
 				stop_fn(protocol, i, manager->arg);
 			}
 		}
@@ -318,7 +318,7 @@ static bool protocol_process_data_chunk(pb_istream_t* istream, const pb_field_t*
 	int stream_id = request->stream;
 	int byte_count = istream->bytes_left;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	// Check device_id
 	if (device_id < 0 || device_id >= board->devices_count) {
@@ -339,7 +339,7 @@ static bool protocol_process_data_chunk(pb_istream_t* istream, const pb_field_t*
 	protocol_StreamConfig* stream = &device->streams[stream_id];
 
 	// Check stream direction
-	if (stream->direction != protocol_StreamDirection_InputStream) {
+	if (stream->direction != protocol_StreamDirection_STREAM_DIRECTION_INPUT) {
 		protocol_send_error_code(PROTOCOL_STATUS_WRONG_STREAM_DIRECTION, ostream);
 		protocol_discard_data(istream);
 		return true;
@@ -382,7 +382,7 @@ static bool protocol_process_data_chunk(pb_istream_t* istream, const pb_field_t*
 	return true;
 }
 
-static bool request_message_callback(pb_istream_t* stream, const pb_field_t* field, void** arg)
+static bool protocol_decode_payload(pb_istream_t* stream, const pb_field_t* field, void** arg)
 {
 	UNUSED(stream);
 
@@ -396,6 +396,28 @@ static bool request_message_callback(pb_istream_t* stream, const pb_field_t* fie
 	return true;
 }
 
+static bool protocol_encode_payload(pb_ostream_t* stream, const pb_field_t* field, void* const* arg) 
+{
+	void** args = (void**)*arg;
+
+	protocol_t* protocol = (protocol_t*)args[0];
+	int total_size = *(int *)args[1];
+	protocol_write_payload_fn callback = (protocol_write_payload_fn)args[2];
+	void* user_arg = args[3];
+
+	protocol_DataChunk* msg = (protocol_DataChunk*)field->message;
+
+	if (!pb_encode_tag_for_field(stream, field))
+		return false;
+
+	if (!pb_encode_varint(stream, total_size))
+		return false;
+
+	if (stream->callback == NULL)
+		return pb_write(stream, NULL, total_size);
+
+	return callback(protocol, msg->device, msg->stream, msg->frame_count, total_size, stream, user_arg);
+}
 
 /*****************************************************************************
  *                            Declarations Public                            *
@@ -403,23 +425,26 @@ static bool request_message_callback(pb_istream_t* stream, const pb_field_t* fie
 
 protocol_t* protocol_create(
 	const char* board_name, 
+	const uint8_t* serial,
 	protocol_Version firmware_version)
 {
-	protocol_Board* board = (protocol_Board*)protocol_malloc(sizeof(protocol_Board));
+	
+	protocol_t* protocol = pmem_alloc_protocol();
+	if (protocol == NULL)
+		return NULL;
+	protocol->device_managers = NULL;
+	
+	protocol_Board* board = &protocol->board;
 	if (board == NULL)
 		return NULL;
-	board->name = (char *)board_name;
+	memcpy(&board->serial.uuid[0], serial, 16);
+	board->name = (char*)board_name;
 	board->firmware_version = firmware_version;
 	board->protocol_version = PROTOCOL_VERSION;
 	board->watchdog_timeout = 0;
 	board->devices_count = 0;
-	
-	protocol_t* protocol = (protocol_t*)protocol_malloc(sizeof(protocol_t));
-	if (protocol == NULL)
-		return NULL;
-	protocol->board = board;
-	protocol->device_managers = NULL;
-	
+	board->devices = NULL;
+
 	return protocol;
 }
 
@@ -428,7 +453,7 @@ void protocol_configure_watchdog(
 	int watchdog_timeout_milliseconds,
 	protocol_watchdog_reset_fn watchdog_reset)
 {
-	protocol->board->watchdog_timeout = watchdog_timeout_milliseconds;
+	protocol->board.watchdog_timeout = watchdog_timeout_milliseconds;
 	protocol->watchdog_reset = watchdog_reset;
 }
 
@@ -437,7 +462,7 @@ void protocol_delete(protocol_t* protocol)
 	if (protocol == NULL)
 		return;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 	if (board != NULL) {
 		for (int i = 0; i < board->devices_count; i++) {
 			protocol_Device* device = &board->devices[i];
@@ -445,16 +470,15 @@ void protocol_delete(protocol_t* protocol)
 			for (int j = 0; j < device->options_count; j++) {
 				protocol_Option* option = &device->options[j];
 				if (option->which_value == protocol_Option_oneof_type_tag)
-					protocol_free(option->value.oneof_type.items);
+					pmem_free_plist(option->value.oneof_type.items);
 			}
-			protocol_free(device->options);
+			pmem_free_Option(device->options);
 		}
-		protocol_free(board->devices);
+		pmem_free_Device(board->devices);
 	}
 
-	protocol_free(protocol->board);
-	protocol_free(protocol->device_managers);
-	protocol_free(protocol);
+	pmem_free_device_manager(protocol->device_managers);
+	pmem_free_protocol(protocol);
 }
 
 int protocol_add_device(
@@ -467,12 +491,10 @@ int protocol_add_device(
 	if (protocol == NULL || name == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 	int deviceIndex = board->devices_count++;
 
-	board->devices = (protocol_Device*)protocol_realloc(
-		board->devices, 
-		sizeof(protocol_Device) * board->devices_count);
+	board->devices = pmem_realloc_Device(board->devices, board->devices_count);
 	if (board->devices == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
 	protocol_Device* device = &board->devices[deviceIndex];
@@ -484,11 +506,10 @@ int protocol_add_device(
 	device->options = NULL;
 	device->streams_count = 0;
 	device->streams = NULL;
-	device->status = protocol_DeviceStatus_Ready;
+	device->status = protocol_DeviceStatus_DEVICE_STATUS_READY;
+	device->status_message = NULL;
 
-	protocol->device_managers = (device_manager_t*)protocol_realloc(
-		protocol->device_managers,
-		sizeof(device_manager_t) * board->devices_count);
+	protocol->device_managers = pmem_realloc_device_manager(protocol->device_managers, board->devices_count);
 	if (protocol->device_managers == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
 	protocol->device_managers[deviceIndex] = device_manager;
@@ -509,7 +530,7 @@ int protocol_add_option_int(
 	if(protocol == NULL || name == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -585,7 +606,7 @@ int protocol_add_option_float(
 	if (protocol == NULL || name == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -659,7 +680,7 @@ int protocol_add_option_bool(
 	if (protocol == NULL || name == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -727,7 +748,7 @@ int protocol_add_option_oneof(
 	if (protocol == NULL || name == NULL || items == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -745,7 +766,7 @@ int protocol_add_option_oneof(
 	option->value.oneof_type.default_index = default_index;
 	option->value.oneof_type.current_index = default_index;
 	option->value.oneof_type.items_count = item_count;
-	option->value.oneof_type.items = (char **)protocol_realloc(NULL, sizeof(char *) * item_count);
+	option->value.oneof_type.items = pmem_alloc_plist(item_count);
 
 	if (option->value.oneof_type.items == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
@@ -803,7 +824,7 @@ int protocol_clear_streams(protocol_t* protocol, int device_id)
 	if (protocol == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -816,11 +837,11 @@ int protocol_clear_streams(protocol_t* protocol, int device_id)
 			protocol_Dimension* dimension = &stream->shape[j];
 			char** labels = dimension->labels;
 			if (labels != NULL)
-				protocol_free(labels);
+				pmem_free_plist(labels);
 		}
 	}
 
-	protocol_free(device->streams);
+	pmem_free_StreamConfig(device->streams);
 	device->streams = NULL;
 	device->streams_count = 0;
 
@@ -835,14 +856,12 @@ int protocol_add_stream(
 	protocol_DataType datatype,
 	int frequency,
 	int32_t max_frame_count,
-	float scale,
-	float offset,
 	const char* unit)
 {
 	if (protocol == NULL || name == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -850,9 +869,7 @@ int protocol_add_stream(
 	protocol_Device* device = &board->devices[device_id];
 
 	int stream_id = device->streams_count++;
-	device->streams = (protocol_StreamConfig*)protocol_realloc(
-		device->streams, 
-		sizeof(protocol_StreamConfig) * device->streams_count);
+	device->streams = pmem_realloc_StreamConfig(device->streams, device->streams_count);
 	if (device->streams == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
 	protocol_StreamConfig* stream = &device->streams[stream_id];
@@ -863,11 +880,45 @@ int protocol_add_stream(
 	stream->shape_count = 0;
 	stream->frequency = frequency;
 	stream->max_frame_count = max_frame_count;
-	stream->scale = scale;
-	stream->offset = offset;
 	stream->unit = (char *)unit;
+	stream->current_frame = 0;
+	stream->frames_dropped = 0;
+	stream->scale = 1;
+	stream->offset = 0;
+	stream->shift = 0;
 
 	return stream_id;
+}
+
+int protocol_set_stream_quantization_options(
+	protocol_t* protocol,
+	int device_id,
+	int stream_id,
+	int32_t shift,
+	float scale,
+	int64_t offset)
+{
+	if (protocol == NULL)
+		return PROTOCOL_STATUS_NULL_ARGUMENT;
+
+	protocol_Board* board = &protocol->board;
+
+	if (device_id < 0 || device_id >= board->devices_count)
+		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
+
+	protocol_Device* device = &board->devices[device_id];
+
+	// Check stream_id
+	if (stream_id < 0 || stream_id >= device->streams_count)
+		return PROTOCOL_STATUS_NO_SUCH_STREAM;
+
+	protocol_StreamConfig* stream = &device->streams[stream_id];
+
+	stream->shift = shift;
+	stream->offset = offset;
+	stream->scale = scale;
+
+	return PROTOCOL_STATUS_SUCCESS;
 }
 
 int protocol_add_stream_rank(
@@ -881,7 +932,7 @@ int protocol_add_stream_rank(
 	if (protocol == NULL || name == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -901,7 +952,7 @@ int protocol_add_stream_rank(
 
 	if (labels != NULL) {
 		dim->labels_count = size;
-		dim->labels = (char **)protocol_realloc(NULL, sizeof(char*) * size);
+		dim->labels = pmem_alloc_plist(size);
 		if (dim->labels == NULL)
 			return PROTOCOL_STATUS_MEMORY_ERROR;
 		for (int i = 0; i < size; i++) {
@@ -923,7 +974,7 @@ int protocol_set_device_status(
 	if (protocol == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
@@ -949,7 +1000,7 @@ int protocol_process_request(
 	static void* args[2];
 	args[0] = protocol;
 	args[1] = ostream;
-	request.cb_request_type.funcs.decode = request_message_callback;
+	request.cb_request_type.funcs.decode = protocol_decode_payload;
 	request.cb_request_type.arg = args;
 
 	if (!pb_decode_ex(istream, protocol_Request_fields, &request, PB_DECODE_DELIMITED))
@@ -994,49 +1045,50 @@ void protocol_call_device_poll(
 	protocol_t* protocol,
 	pb_ostream_t* ostream)
 {
-	for (int i = 0; i < protocol->board->devices_count; i++) {
+	for (int i = 0; i < protocol->board.devices_count; i++) {
 		device_manager_t* manager = &protocol->device_managers[i];
 		protocol_device_poll_fn poll = manager->poll;
-		if (poll != NULL && protocol->board->devices[i].status == protocol_DeviceStatus_Active)
+		if (poll != NULL && protocol->board.devices[i].status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE)
 			poll(protocol, i, ostream, manager->arg);
 	}
 }
 
-int protocol_send_data_chunk(
+int protocol_send_data_inquire(
 	protocol_t* protocol,
 	int device_id,
 	int stream_id,
 	int frame_count,
-	pb_ostream_t* ostream,
-	protocol_write_payload_fn callback) 
+	pb_ostream_t* ostream)
 {
 	if (protocol == NULL)
 		return PROTOCOL_STATUS_NULL_ARGUMENT;
 
-	protocol_Board* board = protocol->board;
+	protocol_Board* board = &protocol->board;
 
 	if (device_id < 0 || device_id >= board->devices_count)
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
 
 	protocol_Device* device = &board->devices[device_id];
 
-	if (device->status != protocol_DeviceStatus_Active
-		&& device->status != protocol_DeviceStatus_ActiveWait) {
+	if (device->status != protocol_DeviceStatus_DEVICE_STATUS_ACTIVE
+		&& device->status != protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT) {
 		return PROTOCOL_STATUS_DEVICE_NOT_ACTIVE;
 	}
 
-	protocol_Response response;
-	response.which_response_type = protocol_Response_data_tag;
-	protocol_DataChunk* data = &response.response_type.data;
+	if (stream_id < 0 || stream_id >= device->streams_count)
+		return PROTOCOL_STATUS_NO_SUCH_STREAM;
 
-	// Fill the message with some data
-	data->device = device_id;
-	data->stream = stream_id;
-	data->frame_count = frame_count;
+	protocol_StreamConfig* stream = &device->streams[stream_id];
+	if (stream->direction != protocol_StreamDirection_STREAM_DIRECTION_INPUT)
+		return PROTOCOL_STATUS_WRONG_STREAM_DIRECTION;
 
-	// Set the callback and argument for the payload
-	data->payload.funcs.encode = callback;
-	data->payload.arg = protocol->device_managers[device_id].arg;
+	static protocol_Response response;
+	response.which_response_type = protocol_Response_data_inquire_tag;
+	protocol_DataInquire* inquire = &response.response_type.data_inquire;
+
+	inquire->device = device_id;
+	inquire->frame_count = frame_count;
+	inquire->stream = stream_id;
 
 	if (!pb_encode_ex(ostream, protocol_Response_fields, &response, PB_ENCODE_DELIMITED))
 		return PROTOCOL_STATUS_FAILED_TO_ENCODE_RESPONSE;
@@ -1044,6 +1096,70 @@ int protocol_send_data_chunk(
 	return PROTOCOL_STATUS_SUCCESS;
 }
 
+
+int protocol_send_data_chunk(
+	protocol_t* protocol,
+	int device_id,
+	int stream_id,
+	int frame_count,
+	int frames_skipped,
+	pb_ostream_t* ostream,
+	protocol_write_payload_fn callback) 
+{
+	if (protocol == NULL)
+		return PROTOCOL_STATUS_NULL_ARGUMENT;
+
+	protocol_Board* board = &protocol->board;
+
+	if (device_id < 0 || device_id >= board->devices_count)
+		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
+
+	protocol_Device* device = &board->devices[device_id];
+
+	if (device->status != protocol_DeviceStatus_DEVICE_STATUS_ACTIVE
+		&& device->status != protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT) {
+		return PROTOCOL_STATUS_DEVICE_NOT_ACTIVE;
+	}
+
+	if (stream_id < 0 || stream_id >= device->streams_count)
+		return PROTOCOL_STATUS_NO_SUCH_STREAM;
+
+	protocol_StreamConfig* stream = &device->streams[stream_id];
+
+	// TODO: save shape_flat so that we do compute it each time
+	int shape_flat = 1;
+	for (int i = 0; i < stream->shape_count; i++) {
+		shape_flat *= stream->shape[i].size;
+	}
+
+	static protocol_Response response;
+	response.which_response_type = protocol_Response_data_tag;
+	protocol_DataChunk* data = &response.response_type.data;
+	
+	// Fill the message with some data
+	data->device = device_id;
+	data->stream = stream_id;
+	data->frame_count = frame_count;
+	data->frame_number = stream->current_frame + frames_skipped;
+	stream->current_frame += frame_count + frames_skipped;
+	stream->frames_dropped += frames_skipped;
+
+	// Set the callback and argument for the payload
+	static void* args[4];
+	static int total_size;
+	total_size = frame_count * shape_flat * protocol_get_datatype_size(stream->datatype);
+	args[0] = protocol;
+	args[1] = &total_size;
+	args[2] = callback;
+	args[3] = protocol->device_managers[device_id].arg;
+	data->payload.funcs.encode = protocol_encode_payload;
+	data->payload.arg = args;
+
+	if (!pb_encode_ex(ostream, protocol_Response_fields, &response, PB_ENCODE_DELIMITED))
+		return PROTOCOL_STATUS_FAILED_TO_ENCODE_RESPONSE;
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
 
 bool protocol_send_error_message(int code, const char* error, pb_ostream_t* ostream) 
 {

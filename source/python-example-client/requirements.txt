@@ -1,0 +1,4 @@
+pyserial
+numpy
+protobuf
+grpcio-tools

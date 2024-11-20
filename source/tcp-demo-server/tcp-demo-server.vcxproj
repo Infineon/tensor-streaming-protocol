@@ -34,7 +34,6 @@
     <ClCompile Include="devices\mic\mic.c" />
     <ClCompile Include="devices\model\keyword_spotter.c" />
     <ClCompile Include="devices\model\model.c" />
-    <ClCompile Include="memory_monitor.c" />
     <ClCompile Include="main.c" />
   </ItemGroup>
   <ItemGroup>

@@ -54,22 +54,6 @@ extern "C" {
  // Handy when compiling with -Wextra (as you should :-)
 #define UNUSED(x) (void)(x)
 
-/* Memory allocation functions to use.
- * You can override `protocol_realloc`, `protocol_malloc`, and `protocol_free`
- * by defining them before including this header file.
- * 
- * Note! Same for pb_realloc and pb_free for nanopb.
- */
-#ifndef protocol_realloc
-#    define protocol_realloc(ptr, size) realloc(ptr, size)
-#endif
-#ifndef protocol_malloc
-#    define protocol_malloc(size) protocol_realloc(NULL, size)
-#endif
-#ifndef protocol_free
-#    define protocol_free(ptr) free(ptr)
-#endif
-
  // Return status codes
 #define PROTOCOL_STATUS_SUCCESS                   (0)   // Operation completed successfully
 #define PROTOCOL_STATUS_UNSPECIFIED_ERROR         (-1)  // An unspecified error occurred
@@ -108,23 +92,43 @@ typedef bool (*protocol_data_received)(protocol_t* protocol, protocol_DataChunk 
     
 typedef void (*protocol_watchdog_reset_fn)(protocol_t* protocol);
 
-/* 
+/*
+* Callback for writing payload.
 * Used by protocol_send_data_chunk().
-* 
-* Structure for defining custom output streams. You will need to provide
-* a callback function to write the bytes to your storage, which can be
-* for example a file or a network socket.
 *
-* The callback must conform to these rules:
+* @param protocol: A pointer to the protocol_t object.
+* @param device_id: The ID of the device.
+* @param stream_id: The ID of the stream.
+* @param total_bytes: Total bytes that must be written with one or more calls to pb_write().
+* @param ostream: The protobuf underlying transport stream passed to pb_write().
+* @param arg: User defined argument, defined in device_manager_t.arg.
 *
-* 1) Return false on IO errors. This will cause encoding to abort.
-* 2) You can use state to store your own data (e.g. buffer pointer).
-* 3) pb_write will update bytes_written after your callback runs.
-* 4) Substreams will modify max_size and bytes_written. Don't use them
-*    to calculate any pointers.
+* @return false on IO errors. This will cause encoding to abort.
+*
+* @example:
+* bool write_payload(
+*    protocol_t* protocol,
+*    int device_id,
+*    int32_t stream_id,
+*    int32_t frame_count,
+*    int32_t total_bytes,
+*    pb_ostream_t* ostream,
+*    void *arg)
+* {
+*    // total_bytes is defined as: frame_count * shape.flat * sizeof(element_type)
+*    // The data can be written with a single or multiple calls to pb_write()
+*    uint8_t data[total_bytes]; // your data to send
+*    return pb_write(ostream, data, total_bytes);
+* }
 */
-typedef bool (*protocol_write_payload_fn)(pb_ostream_t* stream, const pb_field_t* field, void* const* arg);
-
+typedef bool (*protocol_write_payload_fn)(
+    protocol_t* protocol,
+    int device_id,
+    int stream_id,
+    int frame_count,
+    int total_bytes,
+    pb_ostream_t* ostream,
+    void* arg);
 
 typedef struct {
     /*
@@ -181,7 +185,7 @@ typedef struct protocol_s {
     /* 
     * The current board state. 
     */
-    protocol_Board* board;
+    protocol_Board board;
 
     /*
     * Collection of callback functions to manage device events.
@@ -203,12 +207,14 @@ typedef struct protocol_s {
   * Create a new protocol_t object.
   *
   * @param board_name: The name of the board.
+  * @param serial_uuid: 16 bytes serial number UUID. Used by host software to uniquely identify a device.
   * @param firmware_version: The version of the firmware.
   * 
   * @return A pointer to the newly created protocol_t object, or NULL on failure.
   */
 protocol_t* protocol_create(
     const char* board_name, 
+    const uint8_t* serial_uuid,
     protocol_Version firmware_version);
 
 /**
@@ -457,8 +463,6 @@ int protocol_clear_streams(protocol_t* protocol, int device);
 * @param datatype: The data type of the stream.
 * @param frequency: The frequency of the stream.
 * @param max_frame_count: The maximum number of frames in each DataChunk.
-* @param scale: The scale for quantized data streams. Default to 1.
-* @param offset: The offset for quantized data streams. Default to 0.
 * @param unit: The unit name if available. e.g. m/s² (feel free to use unicode)
 * 
 * @return The new stream_id (index) or a negative value on error.
@@ -470,10 +474,36 @@ int protocol_add_stream(
     protocol_StreamDirection direction, 
     protocol_DataType datatype, 
     int frequency,              
-    int32_t max_frame_count,
-    float scale,              
-    float offset,              
+    int32_t max_frame_count,            
     const char* unit);         
+
+/**
+* Set quantization options for stream.
+* 
+* For D types: 
+*   real_value = (int_value - offset) * scale
+* 
+* For Q types:
+*   real_value = int8_value / (128 >> shift)
+*   real_value = int16_value / (32768 >> shift)
+*   real_value = int32_value / (2147483648 >> shift)
+* 
+* @param protocol: A pointer to the protocol_t object.
+* @param device_id: The ID of the device.
+* @param stream_id: The stream ID (index) to configure.
+* @param shift: The shift for quantized data streams. Default to 0. Only used for types DATA_TYPE_Qxx. 
+* @param scale: The scale for quantized data streams. Default to 1. Only used for types DATA_TYPE_Dxx.
+* @param offset: The offset for quantized data streams. Default to 0. Only used for types DATA_TYPE_Dxx.
+* 
+* @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+*/
+int protocol_set_stream_quantization_options(
+    protocol_t* protocol,
+    int device_id,
+    int stream_id,
+    int32_t shift,
+    float scale,
+    int64_t offset);
 
 /*
 * Add a tensor dimension (rank). 
@@ -532,6 +562,8 @@ int protocol_set_device_status(
 * @param device: The ID of the device.
 * @param stream: The ID of the stream.
 * @param frame_count: The number of frames in the message.
+* @param frames_skipped: The number of frames skipped between the last sent chunk and this. Default 0. 
+*   The stream frame counter will be updated as: stream->current_frame += frame_count + frames_skipped
 * @param ostream: The output stream to send the message.
 * @param callback: The callback function to write the payload.
 * 
@@ -542,8 +574,27 @@ int protocol_send_data_chunk(
     int device,
     int stream,
     int frame_count,
+    int frames_skipped,
     pb_ostream_t* ostream,
     protocol_write_payload_fn callback);
+
+/*
+* Sends a DataInquire message on the given device/stream.
+*
+* @param protocol: A pointer to the protocol_t object.
+* @param device: The ID of the device.
+* @param stream: The ID of the stream.
+* @param frame_count: The number of frames to request.
+* @param ostream: The output stream to send the message.
+*
+* @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+*/
+int protocol_send_data_inquire(
+    protocol_t* protocol,
+    int device,
+    int stream,
+    int frame_count,
+    pb_ostream_t* ostream);
 
 /*
 * Reads and processes a message from istream, any response is written to given ostream.

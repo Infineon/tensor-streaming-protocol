@@ -5,8 +5,8 @@ CP = cp
 
 CFLAGS = -O3 -DPB_ENABLE_MALLOC -Wall -Wextra -I.
 
-HEADERS = protocol.pb.h model.pb.h pb_encode.h pb_decode.h pb_common.h protocol.h pb.h
-OBJECTS = protocol.pb.o model.pb.o pb_encode.o pb_decode.o pb_common.o protocol.o
+HEADERS = protocol.pb.h model.pb.h pb_encode.h pb_decode.h pb_common.h protocol.h pmem.h pb.h
+OBJECTS = protocol.pb.o model.pb.o pb_encode.o pb_decode.o pb_common.o protocol.o pmem.o
 
 NANOPB_HOME = ../nanopb
 NANOPB_FILES = $(notdir $(wildcard $(NANOPB_HOME)/*.[ch]))
@@ -18,6 +18,9 @@ $(NANOPB_FILES):
 
 %.pb.h %.pb.c: %.proto %.options
 	python3 $(NANOPB_HOME)/generator/nanopb_generator.py $*.proto -f $*.options
+
+protocol_debug.o: protocol_debug.c protocol_debug.h
+	$(CC) $(CFLAGS) -c $< -o $@ -DPROTOCOL_DEBUG_PRINT
 
 protocol.a: $(OBJECTS)
 	$(AR) rcs $@ $^

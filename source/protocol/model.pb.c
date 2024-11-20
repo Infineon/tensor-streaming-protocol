@@ -9,6 +9,9 @@
 PB_BIND(protocol_Version, protocol_Version, AUTO)
 
 
+PB_BIND(protocol_DeviceSerial, protocol_DeviceSerial, AUTO)
+
+
 PB_BIND(protocol_Board, protocol_Board, AUTO)
 
 

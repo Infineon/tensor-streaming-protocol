@@ -44,6 +44,7 @@
     <ClCompile Include="protocol.c" />
     <ClCompile Include="protocol.pb.c" />
     <ClCompile Include="protocol_debug.c" />
+    <ClCompile Include="pmem.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="model.pb.h" />
@@ -51,6 +52,7 @@
     <ClInclude Include="pb_common.h" />
     <ClInclude Include="pb_decode.h" />
     <ClInclude Include="pb_encode.h" />
+    <ClInclude Include="pmem.h" />
     <ClInclude Include="protocol.h" />
     <ClInclude Include="protocol.pb.h" />
     <ClInclude Include="protocol_debug.h" />

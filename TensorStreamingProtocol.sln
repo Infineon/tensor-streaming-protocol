@@ -14,6 +14,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNetCli", "source\DotNetC
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tcp-demo-server", "source\tcp-demo-server\tcp-demo-server.vcxproj", "{6910DEAD-CE08-44DA-93C6-45365382806B}"
 EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "python-example-client", "source\python-example-client\python-example-client.pyproj", "{66123648-8B11-402E-ACE5-E281D7345C22}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -108,6 +110,16 @@ Global
 		{6910DEAD-CE08-44DA-93C6-45365382806B}.Release|x86.ActiveCfg = Debug|ARM
 		{6910DEAD-CE08-44DA-93C6-45365382806B}.Release|x86.Build.0 = Debug|ARM
 		{6910DEAD-CE08-44DA-93C6-45365382806B}.Release|x86.Deploy.0 = Debug|ARM
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Debug|ARM.ActiveCfg = Debug|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Release|ARM.ActiveCfg = Release|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Release|x64.ActiveCfg = Release|Any CPU
+		{66123648-8B11-402E-ACE5-E281D7345C22}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

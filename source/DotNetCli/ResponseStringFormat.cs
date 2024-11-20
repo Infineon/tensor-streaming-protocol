@@ -7,30 +7,11 @@ namespace DotNetCli;
 
 internal static class ResponseStringFormat
 {
-    public static string Format(this Response response)
-    {
-        switch (response.ResponseTypeCase)
-        {
-            case Response.ResponseTypeOneofCase.None:
-                return "Null response.";
-            case Response.ResponseTypeOneofCase.Capabilities:
-                return response.Capabilities.Format();
-            case Response.ResponseTypeOneofCase.Config:
-                return response.Config.Format();
-            case Response.ResponseTypeOneofCase.Error:
-                return response.Error.Format();
-            case Response.ResponseTypeOneofCase.Data:
-                return response.Data.Format();
-            default:
-                throw new ArgumentOutOfRangeException();
-        }
-    }
-
     public static string Format(this DeviceConfigurationResponse response)
     {
         var ret = new StringBuilder();
         int indent = 0;
-        void Line(string key, object value = null) => ret.AppendLine((new String(' ', indent) + key).PadRight(30) + value);
+        void Line(string key, object? value = null) => ret.AppendLine((new String(' ', indent) + key).PadRight(30) + value);
 
         Line("-------------- Device Configuration --------------");
         Line($"[Device {response.Device}]");
@@ -77,13 +58,15 @@ internal static class ResponseStringFormat
     public static string Format(this RepeatedField<StreamConfig> streams, int indent = 0)
     {
         var ret = new StringBuilder();
-        void Line(string key, object value = null) => ret.AppendLine((new String(' ', indent) + key).PadRight(30) + value);
+        void Line(string key, object? value = null) => ret.AppendLine((new String(' ', indent) + key).PadRight(30) + value);
 
         int id = 0;
         foreach (var stream in streams)
         {
             Line($"[Stream {id++}]");
             indent += 4;
+            Line("Current Frame", stream.CurrentFrame);
+            Line("Frames Dropped", stream.FramesDropped);
             Line("Name", stream.Name);
             Line("Direction", stream.Direction);
             Line("Frequency", stream.Frequency + " Hz");
@@ -105,10 +88,6 @@ internal static class ResponseStringFormat
         return $"Error (Code {error.ErrorCode}): {error.ErrorMessage}";
     }
 
-    public static string Format(this DataChunk data)
-    {
-        return $"Data Chunk {data.FrameCount} frames in {data.Payload.Length} bytes from sensor {data.Device}";
-    }
 
     public static string Format(this Protocol.Version version)
     {
@@ -119,10 +98,11 @@ internal static class ResponseStringFormat
     {
         var ret = new StringBuilder();
         int indent = 0;
-        void Line(string key, object value = null) => ret.AppendLine((new String(' ', indent) + key).PadRight(30) + value);
+        void Line(string key, object? value = null) => ret.AppendLine((new String(' ', indent) + key).PadRight(30) + value);
 
         Line("-------------- Board Capabilities --------------");
         Line("Board Name", response.Board.Name);
+        Line("Serial", new Guid(response.Board.Serial.Uuid.Span, bigEndian: true));
         Line("Firmware Version", response.Board.FirmwareVersion.Format());
         Line("Protocol Version", response.Board.ProtocolVersion.Format());
         Line("Watchdog Timeout", response.Board.WatchdogTimeout + " msec");

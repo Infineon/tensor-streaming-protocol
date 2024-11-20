@@ -13,12 +13,13 @@
 /* Struct definitions */
 /* Message to request the capabilities of the board. A board contains one or more devices. */
 typedef struct _protocol_BoardCapabilitiesRequest {
-    /* If negative all devices are in response. */
+    /* If negative all devices are in response, else only given device. */
     int32_t device;
 } protocol_BoardCapabilitiesRequest;
 
 /* Message representing the capabilities of the board. */
 typedef struct _protocol_BoardCapabilitiesResponse {
+    /* Board info */
     struct _protocol_Board *board;
 } protocol_BoardCapabilitiesResponse;
 
@@ -76,13 +77,27 @@ typedef struct _protocol_StopRequest {
 typedef struct _protocol_DataChunk {
     /* The device index this data originates from. */
     int32_t device;
-    /* Device stream index */
+    /* Device stream index. */
     int32_t stream;
     /* The number of frames. This value is equal to or less than StreamConfiguration.max_frame_count */
     int32_t frame_count;
+    /* The index of the first frame.
+ This is incremented in each response with frame_count, unless frames are dropped.
+ The timestamp (seconds) of the first frame in payload is frame_number/StreamConfig.frequency. */
+    int32_t frame_number;
     /* The size of the payload in bytes is: sizeof(DataType) * shape.flat * frame_count */
     pb_callback_t payload;
 } protocol_DataChunk;
+
+/* Streams with STREAM_DIRECTION_INPUT inquire for their data by sending these packages. */
+typedef struct _protocol_DataInquire {
+    /* The device index this data targets. */
+    int32_t device;
+    /* Device stream index. */
+    int32_t stream;
+    /* The number of frames requested. */
+    int32_t frame_count;
+} protocol_DataInquire;
 
 /* Message representing an error response. */
 typedef struct _protocol_ErrorResponse {
@@ -98,6 +113,7 @@ typedef struct _protocol_Response {
         protocol_DeviceConfigurationResponse config;
         protocol_ErrorResponse error;
         protocol_DataChunk data;
+        protocol_DataInquire data_inquire;
     } response_type;
 } protocol_Response;
 
@@ -135,7 +151,8 @@ extern "C" {
 #define protocol_DeviceConfigurationResponse_init_default {0, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL}
 #define protocol_StartRequest_init_default       {0}
 #define protocol_StopRequest_init_default        {0}
-#define protocol_DataChunk_init_default          {0, 0, 0, {{NULL}, NULL}}
+#define protocol_DataChunk_init_default          {0, 0, 0, 0, {{NULL}, NULL}}
+#define protocol_DataInquire_init_default        {0, 0, 0}
 #define protocol_ErrorResponse_init_default      {NULL, 0}
 #define protocol_WatchdogResetRequest_init_default {0}
 #define protocol_Request_init_zero               {{{NULL}, NULL}, 0, {protocol_BoardCapabilitiesRequest_init_zero}}
@@ -147,7 +164,8 @@ extern "C" {
 #define protocol_DeviceConfigurationResponse_init_zero {0, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL}
 #define protocol_StartRequest_init_zero          {0}
 #define protocol_StopRequest_init_zero           {0}
-#define protocol_DataChunk_init_zero             {0, 0, 0, {{NULL}, NULL}}
+#define protocol_DataChunk_init_zero             {0, 0, 0, 0, {{NULL}, NULL}}
+#define protocol_DataInquire_init_zero           {0, 0, 0}
 #define protocol_ErrorResponse_init_zero         {NULL, 0}
 #define protocol_WatchdogResetRequest_init_zero  {0}
 
@@ -171,13 +189,18 @@ extern "C" {
 #define protocol_DataChunk_device_tag            1
 #define protocol_DataChunk_stream_tag            2
 #define protocol_DataChunk_frame_count_tag       3
-#define protocol_DataChunk_payload_tag           4
+#define protocol_DataChunk_frame_number_tag      4
+#define protocol_DataChunk_payload_tag           5
+#define protocol_DataInquire_device_tag          1
+#define protocol_DataInquire_stream_tag          2
+#define protocol_DataInquire_frame_count_tag     3
 #define protocol_ErrorResponse_error_message_tag 1
 #define protocol_ErrorResponse_error_code_tag    2
 #define protocol_Response_capabilities_tag       1
 #define protocol_Response_config_tag             2
 #define protocol_Response_error_tag              3
 #define protocol_Response_data_tag               4
+#define protocol_Response_data_inquire_tag       5
 #define protocol_Request_capabilities_tag        1
 #define protocol_Request_config_tag              2
 #define protocol_Request_start_tag               3
@@ -206,16 +229,18 @@ X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,data,request_type.data),   6)
 X(a, STATIC,   ONEOF,    MESSAGE,  (response_type,capabilities,response_type.capabilities),   1) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (response_type,config,response_type.config),   2) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (response_type,error,response_type.error),   3) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (response_type,data,response_type.data),   4)
+X(a, STATIC,   ONEOF,    MESSAGE,  (response_type,data,response_type.data),   4) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (response_type,data_inquire,response_type.data_inquire),   5)
 #define protocol_Response_CALLBACK NULL
 #define protocol_Response_DEFAULT NULL
 #define protocol_Response_response_type_capabilities_MSGTYPE protocol_BoardCapabilitiesResponse
 #define protocol_Response_response_type_config_MSGTYPE protocol_DeviceConfigurationResponse
 #define protocol_Response_response_type_error_MSGTYPE protocol_ErrorResponse
 #define protocol_Response_response_type_data_MSGTYPE protocol_DataChunk
+#define protocol_Response_response_type_data_inquire_MSGTYPE protocol_DataInquire
 
 #define protocol_BoardCapabilitiesRequest_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, INT32,    device,            1)
+X(a, STATIC,   SINGULAR, SINT32,   device,            1)
 #define protocol_BoardCapabilitiesRequest_CALLBACK NULL
 #define protocol_BoardCapabilitiesRequest_DEFAULT NULL
 
@@ -258,7 +283,7 @@ X(a, STATIC,   SINGULAR, INT32,    device,            1)
 #define protocol_StartRequest_DEFAULT NULL
 
 #define protocol_StopRequest_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, INT32,    device,            1)
+X(a, STATIC,   SINGULAR, SINT32,   device,            1)
 #define protocol_StopRequest_CALLBACK NULL
 #define protocol_StopRequest_DEFAULT NULL
 
@@ -266,9 +291,17 @@ X(a, STATIC,   SINGULAR, INT32,    device,            1)
 X(a, STATIC,   SINGULAR, INT32,    device,            1) \
 X(a, STATIC,   SINGULAR, INT32,    stream,            2) \
 X(a, STATIC,   SINGULAR, INT32,    frame_count,       3) \
-X(a, CALLBACK, SINGULAR, BYTES,    payload,           4)
+X(a, STATIC,   SINGULAR, INT32,    frame_number,      4) \
+X(a, CALLBACK, SINGULAR, BYTES,    payload,           5)
 #define protocol_DataChunk_CALLBACK pb_default_field_callback
 #define protocol_DataChunk_DEFAULT NULL
+
+#define protocol_DataInquire_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, INT32,    device,            1) \
+X(a, STATIC,   SINGULAR, INT32,    stream,            2) \
+X(a, STATIC,   SINGULAR, INT32,    frame_count,       3)
+#define protocol_DataInquire_CALLBACK NULL
+#define protocol_DataInquire_DEFAULT NULL
 
 #define protocol_ErrorResponse_FIELDLIST(X, a) \
 X(a, POINTER,  SINGULAR, STRING,   error_message,     1) \
@@ -291,6 +324,7 @@ extern const pb_msgdesc_t protocol_DeviceConfigurationResponse_msg;
 extern const pb_msgdesc_t protocol_StartRequest_msg;
 extern const pb_msgdesc_t protocol_StopRequest_msg;
 extern const pb_msgdesc_t protocol_DataChunk_msg;
+extern const pb_msgdesc_t protocol_DataInquire_msg;
 extern const pb_msgdesc_t protocol_ErrorResponse_msg;
 extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
 
@@ -305,6 +339,7 @@ extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
 #define protocol_StartRequest_fields &protocol_StartRequest_msg
 #define protocol_StopRequest_fields &protocol_StopRequest_msg
 #define protocol_DataChunk_fields &protocol_DataChunk_msg
+#define protocol_DataInquire_fields &protocol_DataInquire_msg
 #define protocol_ErrorResponse_fields &protocol_ErrorResponse_msg
 #define protocol_WatchdogResetRequest_fields &protocol_WatchdogResetRequest_msg
 
@@ -316,11 +351,12 @@ extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
 /* protocol_DeviceConfigurationResponse_size depends on runtime parameters */
 /* protocol_DataChunk_size depends on runtime parameters */
 /* protocol_ErrorResponse_size depends on runtime parameters */
-#define PROTOCOL_PROTOCOL_PB_H_MAX_SIZE          protocol_OptionValue_size
-#define protocol_BoardCapabilitiesRequest_size   11
+#define PROTOCOL_PROTOCOL_PB_H_MAX_SIZE          protocol_DataInquire_size
+#define protocol_BoardCapabilitiesRequest_size   6
+#define protocol_DataInquire_size                33
 #define protocol_OptionValue_size                22
 #define protocol_StartRequest_size               11
-#define protocol_StopRequest_size                11
+#define protocol_StopRequest_size                6
 #define protocol_WatchdogResetRequest_size       0
 
 #ifdef __cplusplus

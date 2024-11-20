@@ -10,43 +10,53 @@ message Version {
 }
 
 enum DeviceType {
-    Unknown = 0;
-    Sensor = 1;
-    Playback = 2; 
-    Model = 3;  
+    DEVICE_TYPE_UNSPECIFIED = 0;
+    DEVICE_TYPE_SENSOR = 1;
+    DEVICE_TYPE_PLAYBACK = 2; 
+    DEVICE_TYPE_MODEL = 3;  
+    DEVICE_TYPE_OTHER = 4;  
 }
 
 enum DeviceStatus {
     // Ready to be started. The device does not accept or send any DataChunk messages.
-    Ready = 0;
+    DEVICE_STATUS_READY = 0;
 
     // Device is active, sending and receiving DataChunk messages on streams.
-    Active = 1;
+    DEVICE_STATUS_ACTIVE = 1;
 
     // Device is active but in a waiting state. Similar to Active but polling is disabled.
     // Useful when the device is waiting for data.
-    ActiveWait = 2;
+    DEVICE_STATUS_ACTIVE_WAIT = 2;
 
     // Device is halted with an error. See Device.status_message for details.
-    Error = 3;
+    DEVICE_STATUS_ERROR = 3;
+}
+
+message DeviceSerial {
+    // 16 bytes long UUID
+    bytes uuid = 1;
 }
 
 message Board {
+    // Serial number identifier.
+    // This property is used by host software to uniquely identify a device.
+    DeviceSerial serial = 1;   
+
     // User-friendly name for the device board.
-    string name = 1;
+    string name = 2;
 	
     // Firmware version of the device.
-    Version firmware_version = 2;
+    Version firmware_version = 3;
 	
     // Protocol version used.
-    Version protocol_version = 3;
+    Version protocol_version = 4;
 		
     // Time in milliseconds after which the device is reset and stops transmitting data if no watchdog reset message is received.
     // If zero, no watchdog is present. 
-    int32 watchdog_timeout = 4;
-	
+    int32 watchdog_timeout = 5;
+
     // List of devices with their configurations.
-    repeated Device devices = 5;
+    repeated Device devices = 6;
 }
 
 // Structure representing a device with its configuration.
@@ -119,14 +129,28 @@ message StreamConfig {
     // If the frequency is 16kHz, then 160 DataChunks per second should be expected if all DataChunks use the max frame count.
 	int32 max_frame_count = 6;
 
-    // Scale for quantized tensors. Default to 1. 
-    float scale = 7;
-
-     // Offset for quantized tensors. Default to 0.
-    float offset = 8;
-
     // Optional unit name if available (e.g., m/s). Unicode characters are supported.
-    string unit = 9;
+    string unit = 7;
+
+    // Current frame index. Reset to zero when device is stopped.
+    int32 current_frame = 8;
+
+    // Number of frames dropped.
+    int32 frames_dropped = 9;
+
+    // Scale for quantized tensors. Default to 1. Only used for types DATA_TYPE_Dxx.
+    // real_value = (int_value - offset) * scale
+    float scale = 10;
+
+    // Offset for quantized tensors. Default to 0. Only used for types DATA_TYPE_Dxx.
+    // real_value = (int_value - offset) * scale
+    sint64 offset = 11;
+
+    // Shifted Fixed Point. CMSIS compatible.  Only used for types DATA_TYPE_Qxx. 
+    // real_value = int8_value / (128 >> shift)
+    // real_value = int16_value / (32768 >> shift)
+    // real_value = int32_value / (2147483648 >> shift)
+    int32 shift = 12;
 }
 
 // Structure for a dimension in a tensor.
@@ -172,8 +196,9 @@ message OptionOneOf {
 }
 
 enum StreamDirection {
-    InputStream = 0;      // From host to board
-    OutputStream = 1;     // From board to host
+    STREAM_DIRECTION_UNSPECIFIED = 0;      // Not valid
+    STREAM_DIRECTION_INPUT = 1;            // From host to board
+    STREAM_DIRECTION_OUTPUT = 2;           // From board to host
 }
 
 // Enum representing the data type
@@ -187,4 +212,15 @@ enum DataType {
     DATA_TYPE_S32 = 6;     // Signed 32-bit integer
     DATA_TYPE_F32 = 7;     // 32-bit floating point
     DATA_TYPE_F64 = 8;     // 64-bit floating point
+   
+    // CMSIS compatible
+    DATA_TYPE_Q7 = 9;      // Shifted Fixed Point. real_value = int8_value / (128 >> shift)
+    DATA_TYPE_Q15 = 10;    // Shifted Fixed Point. real_value = int16_value / (32768 >> shift)
+    DATA_TYPE_Q31 = 11;    // Shifted Fixed Point. real_value = int32_value / (2147483648 >> shift)
+
+    // Generic quantized 
+    DATA_TYPE_D8 = 12;     // Scaled Fixed Point. real_value = (int8_value - offset) * scale 
+    DATA_TYPE_D16 = 13;    // Scaled Fixed Point. real_value = (int16_value - offset) * scale
+    DATA_TYPE_D32 = 14;    // Scaled Fixed Point. real_value = (int32_value - offset) * scale
+
 }

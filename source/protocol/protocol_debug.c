@@ -1,3 +1,4 @@
+#ifdef PROTOCOL_DEBUG_PRINT
 #include <stdio.h>
 #include "protocol_debug.h"
 
@@ -24,33 +25,36 @@ void protocol_debug_print(protocol_t* protocol)
 		printf("Device                 : %s\n", device->name);
 		printf(" Description           : %s\n", device->description);
 		switch (device->status) {
-		case protocol_DeviceStatus_Ready:
+		case protocol_DeviceStatus_DEVICE_STATUS_READY:
 			printf(" Status                : Ready\n");
 			break;
-		case protocol_DeviceStatus_ActiveWait:
+		case protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT:
 			printf(" Status                : ActiveWait\n");
 			break;
-		case protocol_DeviceStatus_Active:
+		case protocol_DeviceStatus_DEVICE_STATUS_ACTIVE:
 			printf(" Status                : Active\n");
 			break;
-		case protocol_DeviceStatus_Error:
+		case protocol_DeviceStatus_DEVICE_STATUS_ERROR:
 			printf(" Status                : Error\n");
 			break;
 		}
 		printf(" Status Message        : %s\n", device->status_message);
 		printf(" ID                    : %d\n", i);
 		switch (device->type) {
-		case protocol_DeviceType_Unknown:
+		case protocol_DeviceType_DEVICE_TYPE_UNSPECIFIED:
 			printf(" Type                  : Unknown\n");
 			break;
-		case protocol_DeviceType_Sensor:
+		case protocol_DeviceType_DEVICE_TYPE_SENSOR:
 			printf(" Type                  : Sensor\n");
 			break;
-		case protocol_DeviceType_Playback:
+		case protocol_DeviceType_DEVICE_TYPE_PLAYBACK:
 			printf(" Type                  : Playback\n");
 			break;
-		case protocol_DeviceType_Model:
+		case protocol_DeviceType_DEVICE_TYPE_MODEL:
 			printf(" Type                  : Model\n");
+			break;
+		case protocol_DeviceType_DEVICE_TYPE_OTHER:
+			printf(" Type                  : Other\n");
 			break;
 		}
 
@@ -97,10 +101,13 @@ void protocol_debug_print(protocol_t* protocol)
 			printf(" Stream                : %s\n", stream->name);
 			printf("   ID                  : %d\n", j);
 			switch (stream->direction) {
-			case protocol_StreamDirection_InputStream:
+			case protocol_StreamDirection_STREAM_DIRECTION_UNSPECIFIED:
+				printf("   Direction           : Unspecified\n");
+				break;
+			case protocol_StreamDirection_STREAM_DIRECTION_INPUT:
 				printf("   Direction           : InputStream\n");
 				break;
-			case protocol_StreamDirection_OutputStream:
+			case protocol_StreamDirection_STREAM_DIRECTION_OUTPUT:
 				printf("   Direction           : OutputStream\n");
 				break;
 			default:
@@ -134,13 +141,32 @@ void protocol_debug_print(protocol_t* protocol)
 			case protocol_DataType_DATA_TYPE_F64:
 				printf("   Type                : F64\n");
 				break;
+			case protocol_DataType_DATA_TYPE_Q7:
+				printf("   Type                : Q7\n");
+				break;
+			case protocol_DataType_DATA_TYPE_Q15:
+				printf("   Type                : Q15\n");
+				break;
+			case protocol_DataType_DATA_TYPE_Q31:
+				printf("   Type                : Q31\n");
+				break;
+			case protocol_DataType_DATA_TYPE_D8:
+				printf("   Type                : D8\n");
+				break;
+			case protocol_DataType_DATA_TYPE_D16:
+				printf("   Type                : D16\n");
+				break;
+			case protocol_DataType_DATA_TYPE_D32:
+				printf("   Type                : D32\n");
+				break;
+
 			default:
 				break;
 			}
 			printf("   Frequency           : %f\n", stream->frequency);
 			printf("   Max Frames          : %d\n", stream->max_frame_count);
 			printf("   Scale               : %f\n", stream->scale);
-			printf("   Offset              : %f\n", stream->offset);
+			printf("   Offset              : %ld\n", stream->offset);
 			printf("   Rank                : %d\n", stream->shape_count);
 			printf("   Shape               :\n");
 			for (int k = 0; k < stream->shape_count; k++) {
@@ -160,3 +186,4 @@ void protocol_debug_print(protocol_t* protocol)
 	}
 
 }
+#endif /* PROTOCOL_DEBUG_PRINT */

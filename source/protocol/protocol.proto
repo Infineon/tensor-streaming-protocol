@@ -1,42 +1,5 @@
 // Tensor Streaming Protocol
 //
-// This protocol defines a streaming mechanism used for communication between a host and a board.
-// One board may have one or more devices, and each device can have multiple input/output data streams.
-// For example:
-// - Sensors typically have one output stream.
-// - Models have at least one input and one output stream.
-// - Playback devices may only have an input stream.
-//
-//
-// Example:
-//
-// [<= BoardCapabilitiesRequest]
-//   The host sends a BoardCapabilitiesRequest message to inquire about the device capabilities.
-//
-// [=> BoardCapabilitiesResponse]
-//   The device responds with a BoardCapabilitiesResponse message detailing the available devices.
-//   If BoardCapabilitiesResponse.watchdog_timeout is defined (>0), the host must send a WatchdogResetRequest
-//   at specified intervals (in milliseconds) to prevent the device from resetting itself.
-//
-// [<= WatchdogResetRequest]
-//   Resets the watchdog timer on the device. This request should be sent repeatedly every watchdog_timeout milliseconds.
-//
-// For each device of interest:
-//
-// [<= DeviceConfigurationRequest]
-//   Configures the specified device. This request may not initialize the device but will prompt a response
-//   with a DeviceConfigurationResponse message that defines the expected data when a subscription is started.
-//
-// [=> DeviceConfigurationResponse]
-//   Describes the data streams (input/output) of the device once a subscription is started.
-//
-// [<= SubscribeRequest]
-//   Initiates data streaming for the specified device. This request may also initialize the device if the firmware
-//   has not done so already.
-//
-// [=> DataChunk]
-//   For each subscription, the device streams data in DataChunk messages.
-
 // General Notes:
 //   - Avoid using '\r' in strings
 
@@ -65,18 +28,20 @@ message Response {
 		DeviceConfigurationResponse config = 2;
         ErrorResponse error = 3; 
         DataChunk data = 4; 
+        DataInquire data_inquire = 5;
     }
 }
 
 // Message to request the capabilities of the board. A board contains one or more devices.
 message BoardCapabilitiesRequest {
-    // If negative all devices are in response.
-    int32 device = 1; 
+    // If negative all devices are in response, else only given device.
+    sint32 device = 1;
 }
 
 // Message representing the capabilities of the board.
 message BoardCapabilitiesResponse {
-	Board board = 1;
+	// Board info
+    Board board = 1;
 }
 
 // Represents an option value for device configuration.
@@ -128,7 +93,7 @@ message StartRequest {
 // Message to stop streaming data for a specified device.
 message StopRequest {
     // The device index to stop streaming. If negative, all streaming is stopped.
-    int32 device = 1;
+    sint32 device = 1;
 }
 
 // Represents a chunk of data streamed from a device.
@@ -136,14 +101,31 @@ message DataChunk {
 	// The device index this data originates from.
 	int32 device = 1;
 
-    // Device stream index 
+    // Device stream index. 
     int32 stream = 2;
 	
 	// The number of frames. This value is equal to or less than StreamConfiguration.max_frame_count
 	int32 frame_count = 3;
 
+    // The index of the first frame.
+    // This is incremented in each response with frame_count, unless frames are dropped.
+    // The timestamp (seconds) of the first frame in payload is frame_number/StreamConfig.frequency.    
+    int32 frame_number = 4;
+
 	// The size of the payload in bytes is: sizeof(DataType) * shape.flat * frame_count
-	bytes payload = 4;
+	bytes payload = 5;
+}
+
+// Streams with STREAM_DIRECTION_INPUT inquire for their data by sending these packages.
+message DataInquire {
+    // The device index this data targets.
+    int32 device = 1;
+
+    // Device stream index.
+    int32 stream = 2;
+
+    // The number of frames requested.
+    int32 frame_count = 3;
 }
 
 /******************************* ErrorResponse and WatchdogResetRequest *******************************/
@@ -152,7 +134,7 @@ message DataChunk {
 message ErrorResponse {
     string error_message = 1;   // Description of the error
     int32 error_code = 2;       // Error code
-}
+} 
 
 // Request to reset the watchdog timer on the device. This prevents the device from resetting itself.
 message WatchdogResetRequest {}

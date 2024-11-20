@@ -1,8 +1,12 @@
 # Board
+protocol.Board.serial proto3_singular_msgs:true
 protocol.Board.name type:FT_POINTER
 protocol.Board.firmware_version proto3_singular_msgs:true
 protocol.Board.protocol_version proto3_singular_msgs:true
 protocol.Board.devices type:FT_POINTER
+
+# DeviceSerial
+protocol.DeviceSerial.uuid max_size:16 fixed_length:true
 
 # Device
 protocol.Device.name type:FT_POINTER

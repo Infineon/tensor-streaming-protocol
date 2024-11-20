@@ -6,11 +6,24 @@ using Protocol;
 
 namespace DotNetCli;
 
+public readonly record struct StreamKey(int DeviceId, int StreamId);
+
+public interface IStreamHandler
+{
+    void Start(StreamConfig stream);
+
+    // Return false to be called again with more data. 
+    // If false, a StopRequest message will be sent and
+    // the writer will be removed.
+    bool ProcessDataChunk(DataChunk data);
+}
+
 public class Client
 {
     private const int DefaultTcpPort = 12345;
     private const string DefaultTcpHost = "localhost";
-    private const string DefaultComPort = "COM3";
+    private const string DefaultComPort = "COM5";
+    private const int SerialPortBaud = 115200; // 256000 also works for windows
 
     private const string NotConnectedMessage = 
         "Not connected. Try 'open tcp' to connect to default host and port \n" +
@@ -20,14 +33,11 @@ public class Client
     // If true, output will be printed as raw JSON
     public bool JsonOutputFormat;
 
-    // If true a message is shown each time a data packet is received
-    public bool VerboseOutput = true;
-
     // Holds the current request.
     public DeviceConfigurationRequest Config = new();
 
     // If not 0, a watchdog reset message will be sent.
-    public TimeSpan WatchDogReset = TimeSpan.FromSeconds(1);
+    public TimeSpan WatchDogReset = TimeSpan.Zero;
 
     // Connection stream, serial, tcp
     // Note! take a lock on this object before accessing it!
@@ -35,13 +45,17 @@ public class Client
     public object StreamReadLock = new();
     public object StreamWriteLock = new();
 
+    // Download target streams
+    private Dictionary<StreamKey, IStreamHandler> _streamHandler = new();
+    private Dictionary<StreamKey, StreamConfig> _streamConfigs = new();
+
     public void Run()
     {
         // Start receive thread that print response messages
         var receiveThread = new Thread(ReceiveThreadHandler);
         receiveThread.Start();
 
-        // Watchdog thread that sends watchdog reset messages periodically 
+        // Watchdog thread that sends watchdog reset messages periodically
         var watchdogThread = new Thread(WatchDogThreadHandler);
         watchdogThread.Start();
 
@@ -54,7 +68,7 @@ public class Client
             {
                 switch (cmd?.Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    case [""]:
+                    case null or [] or [""]:
                         break;
                     case ["connect" or "open", "tcp"]:
                         ConnectTcpCommand(DefaultTcpHost, DefaultTcpPort.ToString());
@@ -80,9 +94,6 @@ public class Client
                     case ["mode"]:
                         ToggleModeCommand();
                         break;
-                    case ["verbose"]:
-                        ToggleVerboseCommand();
-                        break;
                     case ["select", var device]:
                         SelectCommand(device);
                         break;
@@ -107,8 +118,17 @@ public class Client
                     case ["cls"]:
                         ClearScreenCommand();
                         break;
-                    case ["start"]:
-                        StartCommand(Config.Device.ToString());
+                    case ["save", var stream, var fileName, var count]:
+                        SaveCsv(stream, fileName, count);
+                        break;
+                    case ["save", var stream, var fileName]:
+                        SaveCsv(stream, fileName, "1");
+                        break;
+                    case ["display", var stream, var count]:
+                        SaveCsv(stream, null, count);
+                        break;
+                    case ["display", var stream]:
+                        SaveCsv(stream, null, "1");
                         break;
                     case ["stop"]:
                         StopCommand(Config.Device.ToString());
@@ -144,29 +164,49 @@ public class Client
     private static void HelpCommand()
     {
         Console.WriteLine("Available commands:");
-        Console.WriteLine(" open tcp <addr>? <port>?              Connect over TCP. If addr and port are not given, defaults are used.");
-        Console.WriteLine(" open serial <port>?                   Connect over a serial port. Use port names like COM1.");
-        Console.WriteLine(" select <device>                       Select the specified device.");
-        Console.WriteLine(" list all                              List all devices.");
-        Console.WriteLine(" list                                  List the active device.");
-        Console.WriteLine(" mode                                  Toggle JSON mode on/off.");
-        Console.WriteLine(" verbose                               Toggle verbose mode on/off.");
-        Console.WriteLine(" set bool <option> true|false          Set a boolean option on the selected device.");
-        Console.WriteLine(" set int <option> <value>              Set an integer option on the selected device.");
-        Console.WriteLine(" set float <option> <value>            Set a decimal option on the selected device.");
-        Console.WriteLine(" set index <option> <value>            Set an index option on the selected device.");
-        Console.WriteLine(" update                                Send updated options for the selected device.");
-        Console.WriteLine(" clear                                 Clear any queued updates waiting to be sent.");
-        Console.WriteLine(" start                                 Start subscription to the active device. This will also initialize it.");
-        Console.WriteLine(" stop                                  Unsubscribe from the active device.");
-        Console.WriteLine(" stop all                              Unsubscribe from all devices.");
-        Console.WriteLine(" send random <stream> <size> <frames>? Send random data to the active device. If frames are not given, defaults to 1.");
-        Console.WriteLine(" help                                  Display this help message.");
-        Console.WriteLine(" close                                 Disconnect from the current device.");
-        Console.WriteLine(" exit                                  Exit the application.");
+        Console.WriteLine(" open tcp <addr>? <port>?               Connect over TCP. If addr and port are not given, defaults are used.");
+        Console.WriteLine(" open serial <port>?                    Connect over a serial port. Use port names like COM1.");
+        Console.WriteLine(" select <device>                        Select the specified device.");
+        Console.WriteLine(" list all                               List all devices.");
+        Console.WriteLine(" list                                   List the active device.");
+        Console.WriteLine(" mode                                   Toggle JSON mode on/off.");
+        Console.WriteLine(" set bool <option> true|false           Set a boolean option on the selected device.");
+        Console.WriteLine(" set int <option> <value>               Set an integer option on the selected device.");
+        Console.WriteLine(" set float <option> <value>             Set a decimal option on the selected device.");
+        Console.WriteLine(" set index <option> <value>             Set an index option on the selected device.");
+        Console.WriteLine(" update                                 Send updated options for the selected device.");
+        Console.WriteLine(" clear                                  Clear any queued updates waiting to be sent.");
+        Console.WriteLine(" save <stream> <filename.csv> <frames>? Save stream to CSV file. If frames are not given, defaults to 1.");
+        Console.WriteLine(" display <stream> <frames>?             Same as save but writes to screen.");
+        Console.WriteLine(" stop                                   Stop all streams on selected device.");
+        Console.WriteLine(" stop all                               Stop all streams on all devices.");
+        Console.WriteLine(" send random <stream> <frames>?         Send random data to the active device. If frames are not given, defaults to 1.");
+        Console.WriteLine(" help                                   Display this help message.");
+        Console.WriteLine(" close                                  Disconnect from the current device.");
+        Console.WriteLine(" exit                                   Exit the application.");
         Console.WriteLine();
         Console.WriteLine("Use the up and down arrow keys to browse the command history.");
         Console.WriteLine();
+    }
+
+    private void SaveCsv(string streamStr, string? fileName, string framesStr = "1")
+    {
+        if (!int.TryParse(streamStr, out int streamId))
+        {
+            Console.WriteLine($"Unable to parse <stream> integer argument {streamStr}.");
+            return;
+        }
+
+        if (!int.TryParse(framesStr, out int framesCount))
+        {
+            Console.WriteLine($"Unable to parse <frames> integer argument {framesStr}.");
+            return;
+        }
+
+        SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = Config.Device}});
+        SendRequest(new Request { Start = new StartRequest { Device = Config.Device } });
+
+        _streamHandler.Add(new StreamKey(Config.Device, streamId), new CsvWriter(fileName, framesCount));
     }
 
     private void ConnectTcpCommand(string host, string port)
@@ -177,8 +217,7 @@ public class Client
                 Console.WriteLine($"Unable to parse integer port {port}.");
 
             // Close existing connection
-            Stream?.Dispose();
-            Stream = null;
+            CloseStream();
 
             // Connect over TCP
             var client = new TcpClient(host, portNumber);
@@ -201,13 +240,13 @@ public class Client
     {
         try
         {
-            Stream?.Dispose();
-            Stream = null;
+            CloseStream();
 
             lock (StreamWriteLock)
             lock (StreamReadLock)
             {
-                SerialPort serial = new SerialPort(port);
+                SerialPort serial = new SerialPort(port, SerialPortBaud);
+                serial.WriteTimeout = 2000;
                 serial.Open();
                 
                 Stream = serial.BaseStream;
@@ -220,29 +259,23 @@ public class Client
         }
     }
 
+    private void CloseStream()
+    {
+        try
+        {
+            Stream?.Dispose();
+            Stream = null;
+        }
+        catch
+        {
+        }
+    }
+
     private void DisconnectCommand()
     {
-        Stream?.Close();
-        Stream = null;
+        CloseStream();
     }
 
-    private void StartCommand(string deviceStr)
-    {
-        if (Stream is not { CanWrite: true, CanRead: true })
-        {
-            Console.WriteLine(NotConnectedMessage);
-            return;
-        }
-
-        if (!int.TryParse(deviceStr, out var deviceId))
-            Console.WriteLine($"Unable to parse integer argument {deviceStr}.");
-
-        lock (StreamWriteLock)
-        {
-            var request = new Request { Start = new StartRequest { Device = deviceId } };
-            request.WriteDelimitedTo(Stream);
-        }
-    }
 
     private void StopCommand(string deviceStr)
     {
@@ -259,6 +292,16 @@ public class Client
         {
             var request = new Request { Stop = new StopRequest { Device = deviceId } };
             request.WriteDelimitedTo(Stream);
+        }
+
+        IEnumerable<StreamKey> remove
+            = deviceId != -1 
+            ? _streamHandler.Where(x => x.Key.DeviceId == deviceId).Select(x => x.Key) 
+            : _streamHandler.Select(x => x.Key);
+
+        foreach (var key in remove.ToArray())
+        {
+            _streamHandler.Remove(key);
         }
     }
 
@@ -480,23 +523,13 @@ public class Client
             return;
         }
 
-        lock (StreamWriteLock)
-        {
-            var request = new Request { Capabilities = new BoardCapabilitiesRequest { Device = deviceId } };
-            request.WriteDelimitedTo(Stream);
-        }
+        SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = deviceId } });
     }
 
     private void ToggleModeCommand()
     {
         JsonOutputFormat = !JsonOutputFormat;
         Console.WriteLine($"JSON responses is now {(JsonOutputFormat ? "ON" : "OFF")}");
-    }
-
-    private void ToggleVerboseCommand()
-    {
-        VerboseOutput = !VerboseOutput;
-        Console.WriteLine($"Verbose is now {(VerboseOutput ? "ON" : "OFF")}");
     }
 
     private void ClearScreenCommand()
@@ -526,40 +559,122 @@ public class Client
                     response = Response.Parser.ParseDelimitedFrom(Stream);
                 }
 
-                if (!VerboseOutput && response.ResponseTypeCase == Response.ResponseTypeOneofCase.Data)
-                    continue;
+                switch (response.ResponseTypeCase)
+                {
+                    case Response.ResponseTypeOneofCase.None:
+                    {
+                        ClearCurrentConsoleLine();
+                        Console.Write("Null response.");
+                        break;
+                    }
+                    case Response.ResponseTypeOneofCase.Capabilities:
+                    {
+                        ClearCurrentConsoleLine();
+                        foreach (var device in response.Capabilities.Board.Devices)
+                        {
+                            int index = 0;
+                            foreach (var stream in device.Streams)
+                            {
+                                var key = new StreamKey(device.DeviceId, index++);
+                                _streamConfigs[key] = stream;
 
-                ClearCurrentConsoleLine();
-                if (JsonOutputFormat)
-                {
-                    JsonFormatter formatter = new JsonFormatter(JsonFormatter.Settings.Default.WithIndentation());
-                    Console.Write(formatter.Format(response));
-                }
-                else
-                {
-                    Console.Write(response.Format());
-                }
+                                if(_streamHandler.TryGetValue(key, out var handler))
+                                    handler.Start(stream);
+                            }
+                        }
 
-                if (response.ResponseTypeCase == Response.ResponseTypeOneofCase.Capabilities &&
-                    response.Capabilities.Board.WatchdogTimeout != (int)WatchDogReset.TotalMilliseconds)
-                {
-                    WatchDogReset = TimeSpan.FromMilliseconds(response.Capabilities.Board.WatchdogTimeout);
-                    Console.WriteLine($"Watchdog updated to {WatchDogReset}");
-                } 
+                        if (JsonOutputFormat)
+                        {
+                                JsonFormatter formatter = new JsonFormatter(JsonFormatter.Settings.Default.WithIndentation());
+                                Console.Write(formatter.Format(response));
+                            }
+                        else
+                        {
+                            Console.Write(response.Capabilities.Format());
+                        }
+
+                        if (response.Capabilities.Board.WatchdogTimeout != (int)WatchDogReset.TotalMilliseconds)
+                        {
+                            WatchDogReset = TimeSpan.FromMilliseconds(response.Capabilities.Board.WatchdogTimeout);
+                            Console.WriteLine($"Watchdog updated to {WatchDogReset}");
+                        }
+
+                        break;
+                    }
+                    case Response.ResponseTypeOneofCase.Config:
+                    {
+                        ClearCurrentConsoleLine();
+
+                        int index = 0;
+                        foreach (var stream in response.Config.Streams)
+                        {
+                            var key = new StreamKey(response.Config.Device, index++);
+                            _streamConfigs[key] = stream;
+
+                            if (_streamHandler.TryGetValue(key, out var handler))
+                                handler.Start(stream);
+                        }
+                        
+                        if (JsonOutputFormat)
+                        {
+                            JsonFormatter formatter = new JsonFormatter(JsonFormatter.Settings.Default.WithIndentation());
+                            Console.Write(formatter.Format(response));
+                        }
+                        else
+                        {
+                            Console.Write(response.Config.Format());
+                        }
+
+                        break;
+                    }
+                    case Response.ResponseTypeOneofCase.Error:
+                    {
+                        ClearCurrentConsoleLine();
+                        if (JsonOutputFormat)
+                        {
+                            JsonFormatter formatter =
+                                new JsonFormatter(JsonFormatter.Settings.Default.WithIndentation());
+                            Console.Write(formatter.Format(response));
+                        }
+                        else
+                        {
+                            Console.Write(response.Error.Format());
+                        }
+
+                        break;
+                    }
+                    case Response.ResponseTypeOneofCase.Data:
+                    {
+                        StreamKey key = new StreamKey(response.Data.Device, response.Data.Stream);
+                        if (_streamHandler.TryGetValue(key, out var handler))
+                        {
+                            if (!handler.ProcessDataChunk(response.Data))
+                            {
+                                _streamHandler.Remove(key);
+                                SendRequest(new Request { Stop = new StopRequest { Device = key.DeviceId } });
+                            }
+                        }
+
+                        continue;
+                    }
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
 
                 if (Config.Options.Any())
-                    Console.WriteLine($"NOTE! Listing is not updated. There are {Config.Options.Count} update(s) pending 'update' command.");
+                    Console.WriteLine(
+                        $"NOTE! Listing is not updated. There are {Config.Options.Count} update(s) pending 'update' command.");
 
                 PrintPrompt();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Exception: {ex.Message}");
-                Stream?.Dispose();
-                Stream = null;
+                CloseStream();
             }
         }
     }
+
 
     [DoesNotReturn]
     private void WatchDogThreadHandler()
@@ -567,7 +682,7 @@ public class Client
         while (true)
         {
             // Wait for a connection
-            if (Stream == null)
+            if (Stream == null || WatchDogReset == TimeSpan.Zero)
             {
                 Thread.Sleep(100);
                 continue;
@@ -585,18 +700,21 @@ public class Client
                 if(WatchDogReset != TimeSpan.Zero)
                     Thread.Sleep(WatchDogReset);
 
-                lock (StreamWriteLock) 
-                {
-                    var request = new Request { WatchdogReset = new WatchdogResetRequest() };
-                    request.WriteDelimitedTo(Stream);
-                }
+                SendRequest(new Request { WatchdogReset = new WatchdogResetRequest() });
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Exception: {ex.Message}");
-                Stream?.Dispose();
-                Stream = null;
+                CloseStream();
             }
+        }
+    }
+
+    private void SendRequest(Request request)
+    {
+        lock (StreamWriteLock)
+        {
+            request.WriteDelimitedTo(Stream);
         }
     }
 

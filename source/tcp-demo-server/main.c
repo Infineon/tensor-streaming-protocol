@@ -123,9 +123,9 @@ static void handle_client(protocol_t* protocol, int client_socket)
     }
 
     // Halt any active devices
-    for (int i = 0; i < protocol->board->devices_count; i++) {
-        protocol_DeviceStatus status = protocol->board->devices[i].status;
-        if (status == protocol_DeviceStatus_Active || status == protocol_DeviceStatus_ActiveWait) {
+    for (int i = 0; i < protocol->board.devices_count; i++) {
+        protocol_DeviceStatus status = protocol->board.devices[i].status;
+        if (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT) {
             device_manager_t* device_manager = &protocol->device_managers[i];
             device_manager->stop(protocol, i, device_manager->arg);
         }
@@ -217,7 +217,10 @@ int main()
         revision : 0
     };
 
-    protocol_t* protocol = protocol_create("Demo Board", firmware_version);
+    // {290DE5CB-460B-41BF-B257-022F2FD7849F}
+    static uint8_t serial[16] = { 0x29, 0x0d, 0xe5, 0xcb, 0x46, 0x0b, 0x41, 0xbf, 0xb2, 0x57, 0x02, 0x2f, 0x2f, 0xd7, 0x84, 0x9f };
+
+    protocol_t* protocol = protocol_create("Demo Board", serial, firmware_version);
 
     protocol_configure_watchdog(protocol, 1000, watchdog_reset);
 

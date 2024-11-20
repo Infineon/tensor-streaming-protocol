@@ -36,6 +36,9 @@ PB_BIND(protocol_StopRequest, protocol_StopRequest, AUTO)
 PB_BIND(protocol_DataChunk, protocol_DataChunk, AUTO)
 
 
+PB_BIND(protocol_DataInquire, protocol_DataInquire, AUTO)
+
+
 PB_BIND(protocol_ErrorResponse, protocol_ErrorResponse, AUTO)
 
 

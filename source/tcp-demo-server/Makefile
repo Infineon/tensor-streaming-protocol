@@ -7,10 +7,6 @@ HEADERS += devices/camera/camera.h devices/mic/mic.h devices/model/model.h devic
 CFILES = main.c devices/camera/camera.c devices/mic/mic.c devices/model/model.c devices/model/keyword_spotter.c
 LIBS = ../protocol/protocol.a -lm
 
-# To monitor malloc, realloc and free
-# CFILES += memory_monito.c
-# CFLAGS += -Dprotocol_realloc=__protocol_realloc -Dprotocol_free=__protocol_free
-
 all: main
 
 protocol:

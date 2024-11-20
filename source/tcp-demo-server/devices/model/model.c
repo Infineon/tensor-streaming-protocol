@@ -99,7 +99,7 @@ void model_register(protocol_t* protocol)
 
     int model = protocol_add_device(
         protocol,
-        protocol_DeviceType_Sensor,
+        protocol_DeviceType_DEVICE_TYPE_MODEL,
         "Model",
         "Example model test",
         manager);
@@ -109,11 +109,10 @@ void model_register(protocol_t* protocol)
         protocol,
         model,
         "Audio In",
-        protocol_StreamDirection_InputStream,
+        protocol_StreamDirection_STREAM_DIRECTION_INPUT,
         protocol_DataType_DATA_TYPE_F32,
         0,
         100,
-        0, 0,
         NULL);
     protocol_add_stream_rank(protocol, model, in_stream, "Mono", 1, NULL);
 
@@ -121,11 +120,10 @@ void model_register(protocol_t* protocol)
         protocol,
         model,
         "Predictions",
-        protocol_StreamDirection_OutputStream,
+        protocol_StreamDirection_STREAM_DIRECTION_OUTPUT,
         protocol_DataType_DATA_TYPE_F32,
         0,
         100,
-        0, 0,
         NULL);
     protocol_add_stream_rank(protocol, model, out_stream, "Classes", 3, (const char* []) { "none", "up", "down" });
 
