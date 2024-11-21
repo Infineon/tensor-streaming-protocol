@@ -100,22 +100,22 @@ The following steps outline a typical session between a client and a board using
 
 2. **=> BoardCapabilitiesResponse**
 
-   - The board responds with a `BoardCapabilitiesResponse` message detailing the available devices and their capabilities.
-   - If the response includes a `watchdog_timeout`, the client must periodically send `WatchdogResetRequest` messages to prevent the board from resetting.
+    - The board responds with a `BoardCapabilitiesResponse` message detailing the available devices and their capabilities.
+    - If the response includes a `watchdog_timeout`, the client must periodically send `WatchdogResetRequest` messages to prevent the board from resetting.
    
 3. **<= WatchdogResetRequest**
 
-   - Resets the watchdog timer on the board. This request should be sent at intervals specified by `watchdog_timeout`.
+    - Resets the watchdog timer on the board. This request should be sent at intervals specified by `watchdog_timeout`.
    
 For each device of interest:
 
 4. **<= DeviceConfigurationRequest**
 
-   - Configures the specified device with the desired options. This request prompts a `DeviceConfigurationResponse` from the board.
+    - Configures the specified device with the desired options. This request prompts a `DeviceConfigurationResponse` from the board.
 
 5. **=> DeviceConfigurationResponse**
 
-   - The board responds with a `DeviceConfigurationResponse` message describing the configured data streams and their properties.
+    - The board responds with a `DeviceConfigurationResponse` message describing the configured data streams and their properties.
 
 6. **<= StartRequest**
 
@@ -132,7 +132,7 @@ it focuses on defining and using the essential callback functions: `configure_st
 
 By following this guide, you can successfully register a device using the Protocol API, configure its streams, and handle its data using the provided callback functions. The example provided demonstrates how to register a microphone sensor, but the same principles can be applied to other sensors as well. For details on creating a protocol instance and tying it to a serial port, TCP socket, or Bluetooth, refer to [PROTOCOL_BOARD_SETUP.md](PROTOCOL_BOARD_SETUP.md).
 
-For a complete firmware example, see [mtb-example-imagimob-streaming-protocol](https://XXXX)
+For a complete firmware example, see [mtb-example-imagimob-streaming-protocol](https://gitlab.intra.infineon.com/wpp/ce/mtb/mtb-example-imagimob-streaming-protocol/-/tree/topic/protocol_v2?ref_type=heads)
 
 ### Step-by-Step Guide
 
@@ -405,7 +405,7 @@ static void mic_poll(protocol_t* protocol, int device, pb_ostream_t* ostream, vo
         mic->skipped_frames = 0;
     }
 }
-````
+```
 
 #### Define the mic_write_payload Helper Function
 
@@ -439,3 +439,5 @@ static bool mic_write_payload(protocol_t* protocol, int device_id, int stream_id
 ## Contact
 
 support@imagimob.com
+
+www.imagimob.com
