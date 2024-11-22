@@ -1,3 +1,9 @@
+/*
+*
+* WORK IN PROGRESS!!
+* 
+*/
+
 #include <stdio.h>
 #include <pb_decode.h>
 #include <pb_encode.h>
@@ -103,7 +109,6 @@ void model_register(protocol_t* protocol)
         "Model",
         "Example model test",
         manager);
-
     
     int in_stream = protocol_add_stream(
         protocol,
@@ -114,7 +119,7 @@ void model_register(protocol_t* protocol)
         0,
         100,
         NULL);
-    protocol_add_stream_rank(protocol, model, in_stream, "Mono", 1, NULL);
+    protocol_add_stream_rank(protocol, model, in_stream, "Mono", IMAI_DATA_IN_COUNT, NULL);
 
     int out_stream = protocol_add_stream(
         protocol,
@@ -125,6 +130,6 @@ void model_register(protocol_t* protocol)
         0,
         100,
         NULL);
-    protocol_add_stream_rank(protocol, model, out_stream, "Classes", 3, (const char* []) { "none", "up", "down" });
+    protocol_add_stream_rank(protocol, model, out_stream, "Classes", IMAI_DATA_OUT_COUNT, (const char* []) IMAI_SYMBOL_MAP);
 
 }

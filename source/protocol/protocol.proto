@@ -36,12 +36,20 @@ message Response {
 message BoardCapabilitiesRequest {
     // If negative all devices are in response, else only given device.
     sint32 device = 1;
+
+    // Optional tag, this tag will be in the respose.
+    // This may be used to pair Requests with Responses.
+    int32 tag = 2;
 }
 
 // Message representing the capabilities of the board.
 message BoardCapabilitiesResponse {
 	// Board info
     Board board = 1;
+
+    // Tag value from Request. 
+    // This may be used to pair Requests with Responses.
+    int32 tag = 2;
 }
 
 // Represents an option value for device configuration.
@@ -64,6 +72,10 @@ message DeviceConfigurationRequest {
 	
     // The option values for configuration
     repeated OptionValue options = 2; 
+
+    // Optional tag, this tag will be in the respose.
+    // This may be used to pair Requests with Responses.
+    int32 tag = 3;
 }
 
 // Response message describing the device configuration.
@@ -82,6 +94,10 @@ message DeviceConfigurationResponse {
 
     // Optional status message
     string status_message = 5;
+
+    // Tag value from Request. 
+    // This may be used to pair Requests with Responses.
+    int32 tag = 6;
 }
 
 // Message to start streaming data for a specified device.

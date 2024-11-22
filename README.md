@@ -1,20 +1,19 @@
 ﻿# Tensor Streaming Protocol
 
-This protocol defines a streaming mechanism used for communication between a client and a board. The protocol is intended to work over TCP, UDP, serial port, and Bluetooth communication.
+Tensor Streaming Protocol defines a streaming mechanism used for communication between a client and a board. The protocol is intended to work over TCP, UDP, serial port, and Bluetooth communication.
 This protocol is designed to handle multiple data streams from sensors, models, and playback devices, enabling efficient data transfer and processing in embedded systems.
 
-One board may have one or more devices, and each device can have multiple input/output data streams. For example:
-
+A single board can have multiple devices, each device capable of handling multiple input and output data streams. For instance:
 - Sensors typically have one output stream.
 - Models have at least one input and one output stream.
-- Playback devices may only have an input stream.
+- Playback devices commonly have one input stream.
 
 The protocol is based on [protobuf3](https://protobuf.dev/programming-guides/proto3/) and specified in two files:
 
 - [model.proto](source/protocol/model.proto) - Defines the base model for the messages used in the protocol.
 - [protocol.proto](source/protocol/protocol.proto) - Specifies the wire format for request and response messages.
 
-On top of the protobuf, a helper API is defined in [protocol.h](source/protocol/protocol.h) using [Nanopb - Protocol Buffers for Embedded Systems](https://github.com/nanopb/nanopb).
+In addition to the protobuf, a helper API is defined in [protocol.h](source/protocol/protocol.h) using [Nanopb - Protocol Buffers for Embedded Systems](https://github.com/nanopb/nanopb).
 
 ## In this repo
 
@@ -73,8 +72,29 @@ On Ubuntu Linux:
 2. **Start the client CLI**:
     ```sh
     cd source/DotNetCli
+    dotnet build
     dotnet run
     ```
+
+#### Run command script
+
+For scripting -i option may be used.
+
+```sh
+cd source/DotNetCli
+
+cat << EOF > commands.txt
+open serial COM5
+set bool 20 true
+update
+flush
+save 0 foobar.csv 16000
+flush
+exit
+EOF
+
+cat commands.txt | dotnet run -i
+```
 
 ### python-example-client
 
@@ -83,7 +103,7 @@ See [README.md](source/python-example-client) in source/python-example-client
 ## Terminology 
 
 - **Board**: A hardware platform containing one or more devices.
-- **Device**: A component on a board (e.g., sensor, playback device, model) that can produce or consume data.
+- **Device**: A component on a board that can produce or consume data. For instance: sensors, playback devices, models.
 - **Client**: An application that connects to a board via TCP, UDP, serial port, or Bluetooth to interact with devices.
 - **Stream**: A data channel that can either send data (Output) or receive data (Input). Streams are associated with devices.
 - **Frame**: A unit of data sent periodically over a stream, in the form of a tensor.
@@ -127,8 +147,7 @@ For each device of interest:
 
 ## Instructions for Registering a Device to the Protocol (Example)
 
-This guide provides an example on how to register a device using the Protocol API. Specifically, 
-it focuses on defining and using the essential callback functions: `configure_streams`, `start`, `stop`, and `poll`.
+This guide provides an example on how to register a device using the Protocol API. It focuses on defining and using the essential callback functions: `configure_streams`, `start`, `stop`, and `poll`.
 
 By following this guide, you can successfully register a device using the Protocol API, configure its streams, and handle its data using the provided callback functions. The example provided demonstrates how to register a microphone sensor, but the same principles can be applied to other sensors as well. For details on creating a protocol instance and tying it to a serial port, TCP socket, or Bluetooth, refer to [PROTOCOL_BOARD_SETUP.md](PROTOCOL_BOARD_SETUP.md).
 

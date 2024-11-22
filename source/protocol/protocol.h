@@ -46,7 +46,7 @@ extern "C" {
 #define PROTOCOL_VERSION \
 (protocol_Version) {     \
     major: 1,            \
-    minor: 3,            \
+    minor: 4,            \
     build: 20241108,     \
     revision: 0          \
 }
@@ -538,8 +538,15 @@ int protocol_add_stream_rank(
     int size, 
     const char** labels);
 
+
 /*
 * Set device status with an optional message.
+* 
+* Note, When the device status is changed from 
+* DEVICE_STATUS_READY or DEVICE_STATUS_ERROR 
+* to
+* DEVICE_STATUS_ACTIVE or DEVICE_ACTIVE_WAIT 
+* all the streams frame counters are cleared.
 *
 * @param protocol: A pointer to the protocol_t object.
 * @param device_id: The ID of the device.

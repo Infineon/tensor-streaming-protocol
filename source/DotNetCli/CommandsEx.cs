@@ -1,0 +1,119 @@
+﻿using Google.Protobuf;
+using Protocol;
+
+namespace DotNetCli;
+
+/// <summary>
+/// Additional commands
+/// </summary>
+internal static class CommandsEx
+{
+    public static void Stats(IClient client, string streamStr, string framesStr = "1")
+    {
+        if (!int.TryParse(streamStr, out int streamId))
+        {
+            client.ErrorMessage($"Unable to parse <stream> integer argument {streamStr}.");
+            return;
+        }
+
+        if (!int.TryParse(framesStr, out int frameCount))
+        {
+            client.ErrorMessage($"Unable to parse <frames> integer argument {framesStr}.");
+            return;
+        }
+
+        if (frameCount <= 0)
+        {
+            client.ErrorMessage("<frames> must be larger or equal to 1");
+            return;
+        }
+
+        client.CheckConnected();
+        
+        // The Tag=-1 will prevent the response to be w
+        client.SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = client.Config.Device, Tag = -1} });
+        client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
+
+        client.AddStreamHandler(client.Config.Device, streamId, new StreamMeasure(client, frameCount));
+    }
+
+    public static void SaveCsv(IClient client, string streamStr, string? fileName, string framesStr = "1")
+    {
+        if (!int.TryParse(streamStr, out int streamId))
+        {
+            client.ErrorMessage($"Unable to parse <stream> integer argument {streamStr}.");
+            return;
+        }
+
+        if (!int.TryParse(framesStr, out int frameCount))
+        {
+            client.ErrorMessage($"Unable to parse <frames> integer argument {framesStr}.");
+            return;
+        }
+
+        if (frameCount <= 0)
+        {
+            client.ErrorMessage("<frames> must be larger or equal to 1");
+            return;
+        }
+
+        client.CheckConnected();
+
+        client.SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = client.Config.Device, Tag = -1 } });
+        client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
+
+        client.AddStreamHandler(client.Config.Device, streamId, new CsvWriter(client, frameCount, fileName));
+    }
+
+    public static void SendRandomDataCommand(IClient client, string deviceStr, string streamStr, string sizeStr, string framesStr)
+    {
+        if (!int.TryParse(deviceStr, out int deviceId))
+        {
+            client.ErrorMessage($"Unable to parse <device> integer argument {deviceStr}");
+            return;
+        }
+
+        if (!int.TryParse(streamStr, out int streamId))
+        {
+            client.ErrorMessage($"Unable to parse <stream> integer argument {streamStr}");
+            return;
+        }
+
+        if (!int.TryParse(sizeStr, out int size))
+        {
+            client.ErrorMessage($"Unable to parse <size> integer argument {sizeStr}");
+            return;
+        }
+
+        if (!int.TryParse(framesStr, out int frameCount))
+        {
+            client.ErrorMessage($"Unable to parse <frames> integer argument {framesStr}");
+            return;
+        }
+
+        if (frameCount <= 0)
+        {
+            client.ErrorMessage("<frames> must be larger or equal to 1");
+            return;
+        }
+
+        client.CheckConnected();
+
+        byte[] buffer = new byte[size];
+        Random.Shared.NextBytes(buffer);
+
+        var request = new Request
+        {
+            Data = new DataChunk
+            {
+                Device = deviceId,
+                Stream = streamId,
+                FrameCount = frameCount,
+                Payload = ByteString.CopyFrom(buffer),
+            }
+        };
+        client.SendRequest(request);
+
+    }
+
+}

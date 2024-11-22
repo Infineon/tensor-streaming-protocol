@@ -29,7 +29,6 @@
     <Compile Include="setup.py" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Makefile" />
     <Content Include="README.md" />
     <Content Include="requirements.txt" />
   </ItemGroup>

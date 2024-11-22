@@ -101,6 +101,7 @@ static bool protocol_process_capabilities_request(
 
 	protocol_Response response;
 	response.which_response_type = protocol_Response_capabilities_tag;
+	response.response_type.capabilities.tag = request->request_type.capabilities.tag;
 
 	protocol_Board* board = &protocol->board;
 
@@ -183,6 +184,7 @@ static bool protocol_process_config_request(
 	// Create an updated DeviceConfigurationResponse
 	protocol_Response response;
 	response.which_response_type = protocol_Response_config_tag;
+	response.response_type.config.tag = request->request_type.config.tag;
 	protocol_DeviceConfigurationResponse* response_msg = &response.response_type.config;
 	protocol_Device* device = &protocol->board.devices[device_id];
 	response_msg->device = device_id;
@@ -980,6 +982,14 @@ int protocol_set_device_status(
 		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
 
 	protocol_Device* device = &board->devices[device_id];
+	
+	if ((device->status == protocol_DeviceStatus_DEVICE_STATUS_READY || device->status == protocol_DeviceStatus_DEVICE_STATUS_ERROR) &&
+		(status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT)) {
+		for (int i = 0; i < device->streams_count; i++) {
+			device->streams[i].current_frame = 0;
+			device->streams[i].frames_dropped = 0;
+		}
+	}
 
 	device->status = status;
 	device->status_message = (char*)message;
@@ -1006,7 +1016,7 @@ int protocol_process_request(
 	if (!pb_decode_ex(istream, protocol_Request_fields, &request, PB_DECODE_DELIMITED))
 	    return PROTOCOL_STATUS_FAILED_TO_DECODE_REQUEST;
 
-	switch (request.which_request_type)
+	switch (request.which_request_type) 
 	{
 	case protocol_Request_capabilities_tag:
 		protocol_process_capabilities_request(protocol, &request, ostream);

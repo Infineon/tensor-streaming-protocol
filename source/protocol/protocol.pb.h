@@ -15,12 +15,18 @@
 typedef struct _protocol_BoardCapabilitiesRequest {
     /* If negative all devices are in response, else only given device. */
     int32_t device;
+    /* Optional tag, this tag will be in the respose.
+ This may be used to pair Requests with Responses. */
+    int32_t tag;
 } protocol_BoardCapabilitiesRequest;
 
 /* Message representing the capabilities of the board. */
 typedef struct _protocol_BoardCapabilitiesResponse {
     /* Board info */
     struct _protocol_Board *board;
+    /* Tag value from Request. 
+ This may be used to pair Requests with Responses. */
+    int32_t tag;
 } protocol_BoardCapabilitiesResponse;
 
 /* Represents an option value for device configuration. */
@@ -43,6 +49,9 @@ typedef struct _protocol_DeviceConfigurationRequest {
     /* The option values for configuration */
     pb_size_t options_count;
     struct _protocol_OptionValue *options;
+    /* Optional tag, this tag will be in the respose.
+ This may be used to pair Requests with Responses. */
+    int32_t tag;
 } protocol_DeviceConfigurationRequest;
 
 /* Response message describing the device configuration. */
@@ -59,6 +68,9 @@ typedef struct _protocol_DeviceConfigurationResponse {
     protocol_DeviceStatus status;
     /* Optional status message */
     char *status_message;
+    /* Tag value from Request. 
+ This may be used to pair Requests with Responses. */
+    int32_t tag;
 } protocol_DeviceConfigurationResponse;
 
 /* Message to start streaming data for a specified device. */
@@ -144,11 +156,11 @@ extern "C" {
 /* Initializer values for message structs */
 #define protocol_Request_init_default            {{{NULL}, NULL}, 0, {protocol_BoardCapabilitiesRequest_init_default}}
 #define protocol_Response_init_default           {0, {protocol_BoardCapabilitiesResponse_init_default}}
-#define protocol_BoardCapabilitiesRequest_init_default {0}
-#define protocol_BoardCapabilitiesResponse_init_default {NULL}
+#define protocol_BoardCapabilitiesRequest_init_default {0, 0}
+#define protocol_BoardCapabilitiesResponse_init_default {NULL, 0}
 #define protocol_OptionValue_init_default        {0, 0, {0}}
-#define protocol_DeviceConfigurationRequest_init_default {0, 0, NULL}
-#define protocol_DeviceConfigurationResponse_init_default {0, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL}
+#define protocol_DeviceConfigurationRequest_init_default {0, 0, NULL, 0}
+#define protocol_DeviceConfigurationResponse_init_default {0, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL, 0}
 #define protocol_StartRequest_init_default       {0}
 #define protocol_StopRequest_init_default        {0}
 #define protocol_DataChunk_init_default          {0, 0, 0, 0, {{NULL}, NULL}}
@@ -157,11 +169,11 @@ extern "C" {
 #define protocol_WatchdogResetRequest_init_default {0}
 #define protocol_Request_init_zero               {{{NULL}, NULL}, 0, {protocol_BoardCapabilitiesRequest_init_zero}}
 #define protocol_Response_init_zero              {0, {protocol_BoardCapabilitiesResponse_init_zero}}
-#define protocol_BoardCapabilitiesRequest_init_zero {0}
-#define protocol_BoardCapabilitiesResponse_init_zero {NULL}
+#define protocol_BoardCapabilitiesRequest_init_zero {0, 0}
+#define protocol_BoardCapabilitiesResponse_init_zero {NULL, 0}
 #define protocol_OptionValue_init_zero           {0, 0, {0}}
-#define protocol_DeviceConfigurationRequest_init_zero {0, 0, NULL}
-#define protocol_DeviceConfigurationResponse_init_zero {0, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL}
+#define protocol_DeviceConfigurationRequest_init_zero {0, 0, NULL, 0}
+#define protocol_DeviceConfigurationResponse_init_zero {0, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL, 0}
 #define protocol_StartRequest_init_zero          {0}
 #define protocol_StopRequest_init_zero           {0}
 #define protocol_DataChunk_init_zero             {0, 0, 0, 0, {{NULL}, NULL}}
@@ -171,7 +183,9 @@ extern "C" {
 
 /* Field tags (for use in manual encoding/decoding) */
 #define protocol_BoardCapabilitiesRequest_device_tag 1
+#define protocol_BoardCapabilitiesRequest_tag_tag 2
 #define protocol_BoardCapabilitiesResponse_board_tag 1
+#define protocol_BoardCapabilitiesResponse_tag_tag 2
 #define protocol_OptionValue_option_id_tag       1
 #define protocol_OptionValue_int_value_tag       2
 #define protocol_OptionValue_float_value_tag     3
@@ -179,11 +193,13 @@ extern "C" {
 #define protocol_OptionValue_oneof_value_tag     5
 #define protocol_DeviceConfigurationRequest_device_tag 1
 #define protocol_DeviceConfigurationRequest_options_tag 2
+#define protocol_DeviceConfigurationRequest_tag_tag 3
 #define protocol_DeviceConfigurationResponse_device_tag 1
 #define protocol_DeviceConfigurationResponse_options_tag 2
 #define protocol_DeviceConfigurationResponse_streams_tag 3
 #define protocol_DeviceConfigurationResponse_status_tag 4
 #define protocol_DeviceConfigurationResponse_status_message_tag 5
+#define protocol_DeviceConfigurationResponse_tag_tag 6
 #define protocol_StartRequest_device_tag         1
 #define protocol_StopRequest_device_tag          1
 #define protocol_DataChunk_device_tag            1
@@ -240,12 +256,14 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (response_type,data_inquire,response_type.dat
 #define protocol_Response_response_type_data_inquire_MSGTYPE protocol_DataInquire
 
 #define protocol_BoardCapabilitiesRequest_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, SINT32,   device,            1)
+X(a, STATIC,   SINGULAR, SINT32,   device,            1) \
+X(a, STATIC,   SINGULAR, INT32,    tag,               2)
 #define protocol_BoardCapabilitiesRequest_CALLBACK NULL
 #define protocol_BoardCapabilitiesRequest_DEFAULT NULL
 
 #define protocol_BoardCapabilitiesResponse_FIELDLIST(X, a) \
-X(a, POINTER,  OPTIONAL, MESSAGE,  board,             1)
+X(a, POINTER,  OPTIONAL, MESSAGE,  board,             1) \
+X(a, STATIC,   SINGULAR, INT32,    tag,               2)
 #define protocol_BoardCapabilitiesResponse_CALLBACK NULL
 #define protocol_BoardCapabilitiesResponse_DEFAULT NULL
 #define protocol_BoardCapabilitiesResponse_board_MSGTYPE protocol_Board
@@ -261,7 +279,8 @@ X(a, STATIC,   ONEOF,    INT32,    (value,oneof_value,value.oneof_value),   5)
 
 #define protocol_DeviceConfigurationRequest_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, INT32,    device,            1) \
-X(a, POINTER,  REPEATED, MESSAGE,  options,           2)
+X(a, POINTER,  REPEATED, MESSAGE,  options,           2) \
+X(a, STATIC,   SINGULAR, INT32,    tag,               3)
 #define protocol_DeviceConfigurationRequest_CALLBACK NULL
 #define protocol_DeviceConfigurationRequest_DEFAULT NULL
 #define protocol_DeviceConfigurationRequest_options_MSGTYPE protocol_OptionValue
@@ -271,7 +290,8 @@ X(a, STATIC,   SINGULAR, INT32,    device,            1) \
 X(a, POINTER,  REPEATED, MESSAGE,  options,           2) \
 X(a, POINTER,  REPEATED, MESSAGE,  streams,           3) \
 X(a, STATIC,   SINGULAR, UENUM,    status,            4) \
-X(a, POINTER,  SINGULAR, STRING,   status_message,    5)
+X(a, POINTER,  SINGULAR, STRING,   status_message,    5) \
+X(a, STATIC,   SINGULAR, INT32,    tag,               6)
 #define protocol_DeviceConfigurationResponse_CALLBACK NULL
 #define protocol_DeviceConfigurationResponse_DEFAULT NULL
 #define protocol_DeviceConfigurationResponse_options_MSGTYPE protocol_OptionValue
@@ -352,7 +372,7 @@ extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
 /* protocol_DataChunk_size depends on runtime parameters */
 /* protocol_ErrorResponse_size depends on runtime parameters */
 #define PROTOCOL_PROTOCOL_PB_H_MAX_SIZE          protocol_DataInquire_size
-#define protocol_BoardCapabilitiesRequest_size   6
+#define protocol_BoardCapabilitiesRequest_size   17
 #define protocol_DataInquire_size                33
 #define protocol_OptionValue_size                22
 #define protocol_StartRequest_size               11

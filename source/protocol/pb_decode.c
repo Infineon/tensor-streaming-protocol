@@ -23,7 +23,6 @@
  **************************************/
 
 static bool checkreturn buf_read(pb_istream_t *stream, pb_byte_t *buf, size_t count);
-static bool checkreturn pb_decode_varint32_eof(pb_istream_t *stream, uint32_t *dest, bool *eof);
 static bool checkreturn read_raw_value(pb_istream_t *stream, pb_wire_type_t wire_type, pb_byte_t *buf, size_t *size);
 static bool checkreturn decode_basic_field(pb_istream_t *stream, pb_wire_type_t wire_type, pb_field_iter_t *field);
 static bool checkreturn decode_static_field(pb_istream_t *stream, pb_wire_type_t wire_type, pb_field_iter_t *field);
@@ -164,25 +163,18 @@ pb_istream_t pb_istream_from_buffer(const pb_byte_t *buf, size_t msglen)
     return stream;
 }
 
+
 /********************
  * Helper functions *
  ********************/
 
-static bool checkreturn pb_decode_varint32_eof(pb_istream_t *stream, uint32_t *dest, bool *eof)
+bool checkreturn pb_decode_varint32(pb_istream_t *stream, uint32_t *dest)
 {
     pb_byte_t byte;
     uint32_t result;
     
     if (!pb_readbyte(stream, &byte))
     {
-        if (stream->bytes_left == 0)
-        {
-            if (eof)
-            {
-                *eof = true;
-            }
-        }
-
         return false;
     }
     
@@ -232,11 +224,6 @@ static bool checkreturn pb_decode_varint32_eof(pb_istream_t *stream, uint32_t *d
    
    *dest = result;
    return true;
-}
-
-bool checkreturn pb_decode_varint32(pb_istream_t *stream, uint32_t *dest)
-{
-    return pb_decode_varint32_eof(stream, dest, NULL);
 }
 
 #ifndef PB_WITHOUT_64BIT
@@ -294,9 +281,32 @@ bool checkreturn pb_decode_tag(pb_istream_t *stream, pb_wire_type_t *wire_type, 
     *eof = false;
     *wire_type = (pb_wire_type_t) 0;
     *tag = 0;
-    
-    if (!pb_decode_varint32_eof(stream, &temp, eof))
+
+    if (stream->bytes_left == 0)
     {
+        *eof = true;
+        return false;
+    }
+
+    if (!pb_decode_varint32(stream, &temp))
+    {
+#ifndef PB_BUFFER_ONLY
+        /* Workaround for issue #1017
+         *
+         * Callback streams don't set bytes_left to 0 on eof until after being called by pb_decode_varint32,
+         * which results in "io error" being raised. This contrasts the behavior of buffer streams who raise
+         * no error on eof as bytes_left is already 0 on entry. This causes legitimate errors (e.g. missing
+         * required fields) to be incorrectly reported by callback streams.
+         */
+        if (stream->callback != buf_read && stream->bytes_left == 0)
+        {
+#ifndef PB_NO_ERRMSG
+            if (strcmp(stream->errmsg, "io error") == 0)
+                stream->errmsg = NULL;
+#endif
+            *eof = true;
+        }
+#endif
         return false;
     }
     
@@ -1000,6 +1010,10 @@ static bool pb_message_set_to_defaults(pb_field_iter_t *iter)
 
 static bool checkreturn pb_decode_inner(pb_istream_t *stream, const pb_msgdesc_t *fields, void *dest_struct, unsigned int flags)
 {
+    /* If the message contains extension fields, the extension handlers
+     * are called when tag number is >= extension_range_start. This precheck
+     * is just for speed, and the handlers will check for precise match.
+     */
     uint32_t extension_range_start = 0;
     pb_extension_t *extensions = NULL;
 
@@ -1011,8 +1025,16 @@ static bool checkreturn pb_decode_inner(pb_istream_t *stream, const pb_msgdesc_t
     pb_size_t fixed_count_size = 0;
     pb_size_t fixed_count_total_size = 0;
 
+    /* Tag and wire type of next field from the input stream */
+    uint32_t tag;
+    pb_wire_type_t wire_type;
+    bool eof;
+
+    /* Track presence of required fields */
     pb_fields_seen_t fields_seen = {{0, 0}};
     const uint32_t allbits = ~(uint32_t)0;
+
+    /* Descriptor for the structure field matching the tag decoded from stream */
     pb_field_iter_t iter;
 
     if (pb_field_iter_begin(&iter, fields, dest_struct))
@@ -1024,24 +1046,13 @@ static bool checkreturn pb_decode_inner(pb_istream_t *stream, const pb_msgdesc_t
         }
     }
 
-    while (stream->bytes_left)
+    while (pb_decode_tag(stream, &wire_type, &tag, &eof))
     {
-        uint32_t tag;
-        pb_wire_type_t wire_type;
-        bool eof;
-
-        if (!pb_decode_tag(stream, &wire_type, &tag, &eof))
-        {
-            if (eof)
-                break;
-            else
-                return false;
-        }
-
         if (tag == 0)
         {
           if (flags & PB_DECODE_NULLTERMINATED)
           {
+            eof = true;
             break;
           }
           else
@@ -1122,6 +1133,12 @@ static bool checkreturn pb_decode_inner(pb_istream_t *stream, const pb_msgdesc_t
             return false;
     }
 
+    if (!eof)
+    {
+        /* pb_decode_tag() returned error before end of stream */
+        return false;
+    }
+
     /* Check that all elements of the last decoded fixed count field were present. */
     if (fixed_count_field != PB_SIZE_MAX &&
         fixed_count_size != fixed_count_total_size)
@@ -1192,16 +1209,7 @@ bool checkreturn pb_decode_ex(pb_istream_t *stream, const pb_msgdesc_t *fields, 
 
 bool checkreturn pb_decode(pb_istream_t *stream, const pb_msgdesc_t *fields, void *dest_struct)
 {
-    bool status;
-
-    status = pb_decode_inner(stream, fields, dest_struct, 0);
-
-#ifdef PB_ENABLE_MALLOC
-    if (!status)
-        pb_release(fields, dest_struct);
-#endif
-
-    return status;
+    return pb_decode_ex(stream, fields, dest_struct, 0);
 }
 
 #ifdef PB_ENABLE_MALLOC
@@ -1435,74 +1443,55 @@ static bool checkreturn pb_dec_bool(pb_istream_t *stream, const pb_field_iter_t 
 
 static bool checkreturn pb_dec_varint(pb_istream_t *stream, const pb_field_iter_t *field)
 {
-    if (PB_LTYPE(field->type) == PB_LTYPE_UVARINT)
+    pb_uint64_t overflow;
+
+    union {
+        pb_uint64_t u64;
+        pb_int64_t s64;
+    } value;
+
+    if (PB_LTYPE(field->type) == PB_LTYPE_SVARINT)
     {
-        pb_uint64_t value, clamped;
-        if (!pb_decode_varint(stream, &value))
+        if (!pb_decode_svarint(stream, &value.s64))
             return false;
-
-        /* Cast to the proper field size, while checking for overflows */
-        if (field->data_size == sizeof(pb_uint64_t))
-            clamped = *(pb_uint64_t*)field->pData = value;
-        else if (field->data_size == sizeof(uint32_t))
-            clamped = *(uint32_t*)field->pData = (uint32_t)value;
-        else if (field->data_size == sizeof(uint_least16_t))
-            clamped = *(uint_least16_t*)field->pData = (uint_least16_t)value;
-        else if (field->data_size == sizeof(uint_least8_t))
-            clamped = *(uint_least8_t*)field->pData = (uint_least8_t)value;
-        else
-            PB_RETURN_ERROR(stream, "invalid data_size");
-
-        if (clamped != value)
-            PB_RETURN_ERROR(stream, "integer too large");
-
-        return true;
     }
     else
     {
-        pb_uint64_t value;
-        pb_int64_t svalue;
-        pb_int64_t clamped;
-
-        if (PB_LTYPE(field->type) == PB_LTYPE_SVARINT)
-        {
-            if (!pb_decode_svarint(stream, &svalue))
-                return false;
-        }
-        else
-        {
-            if (!pb_decode_varint(stream, &value))
-                return false;
-
-            /* See issue 97: Google's C++ protobuf allows negative varint values to
-            * be cast as int32_t, instead of the int64_t that should be used when
-            * encoding. Nanopb versions before 0.2.5 had a bug in encoding. In order to
-            * not break decoding of such messages, we cast <=32 bit fields to
-            * int32_t first to get the sign correct.
-            */
-            if (field->data_size == sizeof(pb_int64_t))
-                svalue = (pb_int64_t)value;
-            else
-                svalue = (int32_t)value;
-        }
-
-        /* Cast to the proper field size, while checking for overflows */
-        if (field->data_size == sizeof(pb_int64_t))
-            clamped = *(pb_int64_t*)field->pData = svalue;
-        else if (field->data_size == sizeof(int32_t))
-            clamped = *(int32_t*)field->pData = (int32_t)svalue;
-        else if (field->data_size == sizeof(int_least16_t))
-            clamped = *(int_least16_t*)field->pData = (int_least16_t)svalue;
-        else if (field->data_size == sizeof(int_least8_t))
-            clamped = *(int_least8_t*)field->pData = (int_least8_t)svalue;
-        else
-            PB_RETURN_ERROR(stream, "invalid data_size");
-
-        if (clamped != svalue)
-            PB_RETURN_ERROR(stream, "integer too large");
-
-        return true;
+        if (!pb_decode_varint(stream, &value.u64))
+            return false;
     }
+
+    /* See issue 97: Google's C++ protobuf allows negative varint values to
+    * be cast as int32_t, instead of the int64_t that should be used when
+    * encoding. Nanopb versions before 0.2.5 had a bug in encoding. In order to
+    * not break decoding of such messages, we cast <=32 bit fields to
+    * int32_t first to get the sign correct.
+    */
+    if (PB_LTYPE(field->type) == PB_LTYPE_VARINT && field->data_size <= 4)
+        value.s64 = (int32_t)value.s64;
+
+    /* Check that the decoded value isn't too small for the field */
+    if (sizeof(pb_uint64_t) < field->data_size)
+        PB_RETURN_ERROR(stream, "invalid data_size");
+
+    /* Check that the decoded value isn't too big for the field. The rules are:
+
+       1.) For unsigned, check if any bit > than field->data_size is set
+       2.) For positive signed, check if any bit >= the sign bit are set
+       3.) For negative signed, negate and check if any bit >= the sign bit are set */
+    overflow = value.u64;
+
+    if (PB_LTYPE(field->type) == PB_LTYPE_UVARINT)
+        overflow >>= 1;
+    else if (value.s64 < 0)
+        overflow = ~overflow;
+
+    if (overflow >> (pb_size_t)((field->data_size << 3) - 1))
+        PB_RETURN_ERROR(stream, "integer too large");
+
+    memcpy(field->pData, &value.u64, field->data_size);
+
+    return true;
 }
 
 static bool checkreturn pb_dec_bytes(pb_istream_t *stream, const pb_field_iter_t *field)

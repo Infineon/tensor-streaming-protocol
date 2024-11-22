@@ -71,8 +71,15 @@ internal static class ResponseStringFormat
             Line("Direction", stream.Direction);
             Line("Frequency", stream.Frequency + " Hz");
             Line("Type", stream.Datatype);
-            Line("Scale", stream.Scale);
-            Line("Offset", stream.Offset);
+            if (stream.Datatype is DataType.D32 or DataType.D16 or DataType.D8)
+            {
+                Line("Scale", stream.Scale);
+                Line("Offset", stream.Offset);
+            } 
+            else if (stream.Datatype is DataType.Q31 or DataType.Q15 or DataType.Q7)
+            {
+                Line("Shift", stream.Shift);
+            }
             Line("Unit", stream.Unit);
             Line("Shape", string.Join(",", stream.Shape.Select(x => x.Size)));
             Line("Dimension Names", string.Join(",", stream.Shape.Select(x => x.Name)));
@@ -87,7 +94,6 @@ internal static class ResponseStringFormat
     {
         return $"Error (Code {error.ErrorCode}): {error.ErrorMessage}";
     }
-
 
     public static string Format(this Protocol.Version version)
     {
