@@ -33,7 +33,13 @@ PB_BIND(protocol_StartRequest, protocol_StartRequest, AUTO)
 PB_BIND(protocol_StopRequest, protocol_StopRequest, AUTO)
 
 
+PB_BIND(protocol_ResetRequest, protocol_ResetRequest, AUTO)
+
+
 PB_BIND(protocol_DataChunk, protocol_DataChunk, AUTO)
+
+
+PB_BIND(protocol_Timestamp, protocol_Timestamp, AUTO)
 
 
 PB_BIND(protocol_DataInquire, protocol_DataInquire, AUTO)

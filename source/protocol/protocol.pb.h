@@ -85,6 +85,11 @@ typedef struct _protocol_StopRequest {
     int32_t device;
 } protocol_StopRequest;
 
+/* Reset request */
+typedef struct _protocol_ResetRequest {
+    char dummy_field;
+} protocol_ResetRequest;
+
 /* Represents a chunk of data streamed from a device. */
 typedef struct _protocol_DataChunk {
     /* The device index this data originates from. */
@@ -99,7 +104,18 @@ typedef struct _protocol_DataChunk {
     int32_t frame_number;
     /* The size of the payload in bytes is: sizeof(DataType) * shape.flat * frame_count */
     pb_callback_t payload;
+    /* Optional timestamps for irregular frames.
+ If present it should contain frame_count items. */
+    pb_size_t timestamps_count;
+    struct _protocol_Timestamp *timestamps;
 } protocol_DataChunk;
+
+typedef struct _protocol_Timestamp {
+    /* Time stamp */
+    int64_t timestamp;
+    /* Optional, 0 if absent. */
+    int32_t duration;
+} protocol_Timestamp;
 
 /* Streams with STREAM_DIRECTION_INPUT inquire for their data by sending these packages. */
 typedef struct _protocol_DataInquire {
@@ -113,8 +129,10 @@ typedef struct _protocol_DataInquire {
 
 /* Message representing an error response. */
 typedef struct _protocol_ErrorResponse {
-    char *error_message; /* Description of the error */
-    int32_t error_code; /* Error code */
+    /* Description of the error */
+    char *error_message;
+    /* Error code */
+    int32_t error_code;
 } protocol_ErrorResponse;
 
 /* Wrapper message for all response types. */
@@ -145,6 +163,7 @@ typedef struct _protocol_Request {
         protocol_StopRequest stop;
         protocol_WatchdogResetRequest watchdog_reset;
         protocol_DataChunk data;
+        protocol_ResetRequest reset;
     } request_type;
 } protocol_Request;
 
@@ -163,7 +182,9 @@ extern "C" {
 #define protocol_DeviceConfigurationResponse_init_default {0, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL, 0}
 #define protocol_StartRequest_init_default       {0}
 #define protocol_StopRequest_init_default        {0}
-#define protocol_DataChunk_init_default          {0, 0, 0, 0, {{NULL}, NULL}}
+#define protocol_ResetRequest_init_default       {0}
+#define protocol_DataChunk_init_default          {0, 0, 0, 0, {{NULL}, NULL}, 0, NULL}
+#define protocol_Timestamp_init_default          {0, 0}
 #define protocol_DataInquire_init_default        {0, 0, 0}
 #define protocol_ErrorResponse_init_default      {NULL, 0}
 #define protocol_WatchdogResetRequest_init_default {0}
@@ -176,7 +197,9 @@ extern "C" {
 #define protocol_DeviceConfigurationResponse_init_zero {0, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL, 0}
 #define protocol_StartRequest_init_zero          {0}
 #define protocol_StopRequest_init_zero           {0}
-#define protocol_DataChunk_init_zero             {0, 0, 0, 0, {{NULL}, NULL}}
+#define protocol_ResetRequest_init_zero          {0}
+#define protocol_DataChunk_init_zero             {0, 0, 0, 0, {{NULL}, NULL}, 0, NULL}
+#define protocol_Timestamp_init_zero             {0, 0}
 #define protocol_DataInquire_init_zero           {0, 0, 0}
 #define protocol_ErrorResponse_init_zero         {NULL, 0}
 #define protocol_WatchdogResetRequest_init_zero  {0}
@@ -207,6 +230,9 @@ extern "C" {
 #define protocol_DataChunk_frame_count_tag       3
 #define protocol_DataChunk_frame_number_tag      4
 #define protocol_DataChunk_payload_tag           5
+#define protocol_DataChunk_timestamps_tag        6
+#define protocol_Timestamp_timestamp_tag         1
+#define protocol_Timestamp_duration_tag          2
 #define protocol_DataInquire_device_tag          1
 #define protocol_DataInquire_stream_tag          2
 #define protocol_DataInquire_frame_count_tag     3
@@ -223,6 +249,7 @@ extern "C" {
 #define protocol_Request_stop_tag                4
 #define protocol_Request_watchdog_reset_tag      5
 #define protocol_Request_data_tag                6
+#define protocol_Request_reset_tag               7
 
 /* Struct field encoding specification for nanopb */
 #define protocol_Request_FIELDLIST(X, a) \
@@ -231,7 +258,8 @@ X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,config,request_type.config),   
 X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,start,request_type.start),   3) \
 X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,stop,request_type.stop),   4) \
 X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,watchdog_reset,request_type.watchdog_reset),   5) \
-X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,data,request_type.data),   6)
+X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,data,request_type.data),   6) \
+X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,reset,request_type.reset),   7)
 #define protocol_Request_CALLBACK NULL
 #define protocol_Request_DEFAULT NULL
 #define protocol_Request_request_type_capabilities_MSGTYPE protocol_BoardCapabilitiesRequest
@@ -240,6 +268,7 @@ X(a, STATIC,   ONEOF,    MSG_W_CB, (request_type,data,request_type.data),   6)
 #define protocol_Request_request_type_stop_MSGTYPE protocol_StopRequest
 #define protocol_Request_request_type_watchdog_reset_MSGTYPE protocol_WatchdogResetRequest
 #define protocol_Request_request_type_data_MSGTYPE protocol_DataChunk
+#define protocol_Request_request_type_reset_MSGTYPE protocol_ResetRequest
 
 #define protocol_Response_FIELDLIST(X, a) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (response_type,capabilities,response_type.capabilities),   1) \
@@ -307,14 +336,27 @@ X(a, STATIC,   SINGULAR, SINT32,   device,            1)
 #define protocol_StopRequest_CALLBACK NULL
 #define protocol_StopRequest_DEFAULT NULL
 
+#define protocol_ResetRequest_FIELDLIST(X, a) \
+
+#define protocol_ResetRequest_CALLBACK NULL
+#define protocol_ResetRequest_DEFAULT NULL
+
 #define protocol_DataChunk_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, INT32,    device,            1) \
 X(a, STATIC,   SINGULAR, INT32,    stream,            2) \
 X(a, STATIC,   SINGULAR, INT32,    frame_count,       3) \
 X(a, STATIC,   SINGULAR, INT32,    frame_number,      4) \
-X(a, CALLBACK, SINGULAR, BYTES,    payload,           5)
+X(a, CALLBACK, SINGULAR, BYTES,    payload,           5) \
+X(a, POINTER,  REPEATED, MESSAGE,  timestamps,        6)
 #define protocol_DataChunk_CALLBACK pb_default_field_callback
 #define protocol_DataChunk_DEFAULT NULL
+#define protocol_DataChunk_timestamps_MSGTYPE protocol_Timestamp
+
+#define protocol_Timestamp_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, INT64,    timestamp,         1) \
+X(a, STATIC,   SINGULAR, INT32,    duration,          2)
+#define protocol_Timestamp_CALLBACK NULL
+#define protocol_Timestamp_DEFAULT NULL
 
 #define protocol_DataInquire_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, INT32,    device,            1) \
@@ -343,7 +385,9 @@ extern const pb_msgdesc_t protocol_DeviceConfigurationRequest_msg;
 extern const pb_msgdesc_t protocol_DeviceConfigurationResponse_msg;
 extern const pb_msgdesc_t protocol_StartRequest_msg;
 extern const pb_msgdesc_t protocol_StopRequest_msg;
+extern const pb_msgdesc_t protocol_ResetRequest_msg;
 extern const pb_msgdesc_t protocol_DataChunk_msg;
+extern const pb_msgdesc_t protocol_Timestamp_msg;
 extern const pb_msgdesc_t protocol_DataInquire_msg;
 extern const pb_msgdesc_t protocol_ErrorResponse_msg;
 extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
@@ -358,7 +402,9 @@ extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
 #define protocol_DeviceConfigurationResponse_fields &protocol_DeviceConfigurationResponse_msg
 #define protocol_StartRequest_fields &protocol_StartRequest_msg
 #define protocol_StopRequest_fields &protocol_StopRequest_msg
+#define protocol_ResetRequest_fields &protocol_ResetRequest_msg
 #define protocol_DataChunk_fields &protocol_DataChunk_msg
+#define protocol_Timestamp_fields &protocol_Timestamp_msg
 #define protocol_DataInquire_fields &protocol_DataInquire_msg
 #define protocol_ErrorResponse_fields &protocol_ErrorResponse_msg
 #define protocol_WatchdogResetRequest_fields &protocol_WatchdogResetRequest_msg
@@ -375,8 +421,10 @@ extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
 #define protocol_BoardCapabilitiesRequest_size   17
 #define protocol_DataInquire_size                33
 #define protocol_OptionValue_size                22
+#define protocol_ResetRequest_size               0
 #define protocol_StartRequest_size               11
 #define protocol_StopRequest_size                6
+#define protocol_Timestamp_size                  22
 #define protocol_WatchdogResetRequest_size       0
 
 #ifdef __cplusplus

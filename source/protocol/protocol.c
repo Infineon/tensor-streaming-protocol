@@ -430,11 +430,11 @@ protocol_t* protocol_create(
 	const uint8_t* serial,
 	protocol_Version firmware_version)
 {
-	
 	protocol_t* protocol = pmem_alloc_protocol();
 	if (protocol == NULL)
 		return NULL;
 	protocol->device_managers = NULL;
+	protocol->board_reset = NULL;
 	
 	protocol_Board* board = &protocol->board;
 	if (board == NULL)
@@ -510,7 +510,7 @@ int protocol_add_device(
 	device->streams = NULL;
 	device->status = protocol_DeviceStatus_DEVICE_STATUS_READY;
 	device->status_message = NULL;
-
+	
 	protocol->device_managers = pmem_realloc_device_manager(protocol->device_managers, board->devices_count);
 	if (protocol->device_managers == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
@@ -1042,6 +1042,11 @@ int protocol_process_request(
 	case protocol_Request_data_tag:
 		break;
 
+	case protocol_Request_reset_tag:
+		if (protocol->board_reset != NULL)
+			protocol->board_reset(protocol);
+		break;
+
 	default:
 		return PROTOCOL_STATUS_INVALID_REQUEST_TYPE;
 	}
@@ -1151,6 +1156,8 @@ int protocol_send_data_chunk(
 	data->stream = stream_id;
 	data->frame_count = frame_count;
 	data->frame_number = stream->current_frame + frames_skipped;
+	data->timestamps_count = 0;
+	data->timestamps = NULL;
 	stream->current_frame += frame_count + frames_skipped;
 	stream->frames_dropped += frames_skipped;
 

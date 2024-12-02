@@ -15,13 +15,26 @@ public static class Program
         var client = new Client();
 
         bool interactive = true;
+        string? testFile = null;
 
-        foreach (var arg in args)
+        for (var index = 0; index < args.Length; index++)
         {
+            var arg = args[index];
             switch (arg)
             {
                 case "--non-interactive" or "-i":
                     interactive = false;
+                    break;
+                case "--test" or "-t":
+                    if (arg.Length - 1 <= index)
+                    {
+                        Console.WriteLine($"Error: Missing argument for option --test/-t");
+                        Console.WriteLine();
+                        PrintUsage();
+                        return -1;
+                    }                        
+                    testFile = args[index+1];
+                    index++;
                     break;
                 default:
                     Console.WriteLine($"Error: Unknown argument {arg}");
@@ -30,7 +43,11 @@ public static class Program
                     return -1;
             }
         }
-        return client.Run(interactive);
+
+        if (testFile != null)
+            return client.RunTestFile(testFile);
+        else
+            return client.Run(interactive);
     }
 
     private static void PrintUsage()

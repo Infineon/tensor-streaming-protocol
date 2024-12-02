@@ -18,6 +18,7 @@ message Request {
 		StopRequest stop = 4;
         WatchdogResetRequest watchdog_reset = 5;
         DataChunk data = 6;
+        ResetRequest reset = 7;
     }
 }
 
@@ -112,6 +113,9 @@ message StopRequest {
     sint32 device = 1;
 }
 
+// Reset request
+message ResetRequest {}
+
 // Represents a chunk of data streamed from a device.
 message DataChunk {
 	// The device index this data originates from.
@@ -130,6 +134,18 @@ message DataChunk {
 
 	// The size of the payload in bytes is: sizeof(DataType) * shape.flat * frame_count
 	bytes payload = 5;
+
+    // Optional timestamps for irregular frames.
+    // If present it should contain frame_count items.
+    repeated Timestamp timestamps = 6;  
+}
+
+message Timestamp {
+    // Time stamp
+    int64 timestamp = 1;
+
+    // Optional, 0 if absent.
+    int32 duration = 2;
 }
 
 // Streams with STREAM_DIRECTION_INPUT inquire for their data by sending these packages.
@@ -148,8 +164,11 @@ message DataInquire {
 
 // Message representing an error response.
 message ErrorResponse {
-    string error_message = 1;   // Description of the error
-    int32 error_code = 2;       // Error code
+    // Description of the error
+    string error_message = 1;
+
+    // Error code
+    int32 error_code = 2;
 } 
 
 // Request to reset the watchdog timer on the device. This prevents the device from resetting itself.

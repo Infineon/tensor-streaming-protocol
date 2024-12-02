@@ -1,4 +1,5 @@
 ﻿using Google.Protobuf;
+using Microsoft.VisualBasic;
 using Protocol;
 
 namespace DotNetCli;
@@ -8,7 +9,7 @@ namespace DotNetCli;
 /// </summary>
 internal static class CommandsEx
 {
-    public static void Stats(IClient client, string streamStr, string framesStr = "1")
+    public static void Stats(IClient client, string streamStr, string framesStr)
     {
         if (!int.TryParse(streamStr, out int streamId))
         {
@@ -32,12 +33,19 @@ internal static class CommandsEx
         
         // The Tag=-1 will prevent the response to be w
         client.SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = client.Config.Device, Tag = -1} });
+
+        if (!client.Interactive)
+            client.FlushCommand();
+
         client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
 
         client.AddStreamHandler(client.Config.Device, streamId, new StreamMeasure(client, frameCount));
+
+        if (!client.Interactive)
+            client.FlushCommand();
     }
 
-    public static void SaveCsv(IClient client, string streamStr, string? fileName, string framesStr = "1")
+    public static void SaveCsv(IClient client, string streamStr, string? fileName, string framesStr)
     {
         if (!int.TryParse(streamStr, out int streamId))
         {
@@ -60,9 +68,16 @@ internal static class CommandsEx
         client.CheckConnected();
 
         client.SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = client.Config.Device, Tag = -1 } });
+
+        // Need to wait for the response here
+        client.FlushCommand();
+
         client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
 
         client.AddStreamHandler(client.Config.Device, streamId, new CsvWriter(client, frameCount, fileName));
+
+        if (!client.Interactive)
+            client.FlushCommand();
     }
 
     public static void SendRandomDataCommand(IClient client, string deviceStr, string streamStr, string sizeStr, string framesStr)

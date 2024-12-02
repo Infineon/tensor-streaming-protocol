@@ -121,6 +121,7 @@ message StreamConfig {
     repeated Dimension shape = 4;
 	
     // Tensor frequency in Hz.
+    // If zero, DataChunk.timestamps must be present.
     float frequency = 5;  
    	
     // Maximum number of frames in each DataChunk.

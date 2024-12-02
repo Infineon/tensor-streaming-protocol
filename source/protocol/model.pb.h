@@ -138,7 +138,8 @@ typedef struct _protocol_StreamConfig {
  The number of items in this list is the tensor rank. */
     pb_size_t shape_count;
     protocol_Dimension shape[6];
-    /* Tensor frequency in Hz. */
+    /* Tensor frequency in Hz.
+ If zero, DataChunk.timestamps must be present. */
     float frequency;
     /* Maximum number of frames in each DataChunk.
  For example, a 16-bit stereo microphone (shape [2]) with max_frame_count=100 may send 100 sample frames in each data chunk.

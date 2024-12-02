@@ -1,11 +1,21 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO.Ports;
 using System.Net.Sockets;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Google.Protobuf;
 using Protocol;
 
 namespace DotNetCli;
+enum TestOperator
+{
+    Equals,
+    LessThan,
+    MoreThan,
+    Contains
+}
 
 public class Client : IClient
 {
@@ -13,15 +23,6 @@ public class Client : IClient
     private const string DefaultTcpHost = "localhost";
     private const string DefaultComPort = "COM5";
     private const int SerialPortBaud = 115200; // 256000 also works for windows
-
-    // False if -i or --non-interactive startup argument was passed, else true.
-    // This will hide the prompt and only print outputs.
-    // On any error the application will exit with -1.
-    // Useful when used in scripts. 
-    private bool _interactive;
-
-    // If true, output will be printed as raw JSON
-    private bool _jsonOutputFormat;
 
     // If not 0, a watchdog reset message will be sent.
     private TimeSpan _watchDogReset = TimeSpan.Zero;
@@ -35,23 +36,64 @@ public class Client : IClient
     private readonly object _streamReadLock = new();
     private readonly object _streamWriteLock = new();
 
+    // True if any test have failed. The exit code will be -1
+    private bool _haveFailedTests = false;
+
     // Download target streams
     private readonly Dictionary<StreamKey, IStreamHandler> _streamHandler = new();
 
     // Holds the current request.
     public DeviceConfigurationRequest Config { get; private set; } = new();
 
-    public int Run(bool interactive = true)
+    // Last response as JSON, used by test command
+    public JsonElement? LastResponseJson { get; set; }
+
+    // If true, output will be printed as raw JSON
+    public PrintMode PrintMode { get; private set; }
+
+    // False if -i or -t startup argument was passed, else true.
+    // This will hide the prompt and only print outputs.
+    // On any error the application will exit with -1.
+    // Useful when used in scripts. 
+    public bool Interactive { get; private set; }
+
+    public int RunTestFile(string testFile)
     {
-        _interactive = interactive;
+        Interactive = false;
+        PrintMode = PrintMode.Silent;
 
-        // Start receive thread that print response messages
-        var receiveThread = new Thread(ReceiveThreadHandler);
-        receiveThread.Start();
+        StartThreads();
 
-        // Watchdog thread that sends watchdog reset messages periodically
-        var watchdogThread = new Thread(WatchDogThreadHandler);
-        watchdogThread.Start();
+        var scriptLines = File.ReadAllLines(testFile);
+
+        try
+        {
+            foreach (var cmd in scriptLines)
+            {
+                if (cmd.StartsWith("#"))
+                {
+                    Console.WriteLine(cmd);
+                    continue;
+                }
+
+                ProcessCommand(cmd);
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage($"Scrip aborted. Error: {ex.Message}");
+            Environment.Exit(1);
+        }
+
+        Environment.Exit(_haveFailedTests ? -1 : 0);
+        return 0;
+    }
+
+    public int Run(bool interactive)
+    {
+        Interactive = interactive;
+
+        StartThreads();
 
         Console.WriteLine();
         while (true)
@@ -64,101 +106,7 @@ public class Client : IClient
 
             try
             {
-                switch (cmd?.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    case null or [] or [""]:
-                        break;
-                    case ["connect" or "open", "tcp"]:
-                        ConnectTcpCommand(DefaultTcpHost, DefaultTcpPort.ToString());
-                        break;
-                    case ["connect" or "open", "tcp", var host, var port]:
-                        ConnectTcpCommand(host, port);
-                        break;
-                    case ["connect" or "open", "serial"]:
-                        ConnectSerialCommand(DefaultComPort);
-                        break;
-                    case ["connect" or "open", "serial", var port]:
-                        ConnectSerialCommand(port);
-                        break;
-                    case ["disconnect" or "close"]:
-                        DisconnectCommand();
-                        break;
-                    case ["list" or "ls", "all"]:
-                        ListCommand("-1");
-                        break;
-                    case ["list" or "ls"]:
-                        ListCommand(Config.Device.ToString());
-                        break;
-                    case ["mode"]:
-                        ToggleModeCommand();
-                        break;
-                    case ["select", var device]:
-                        SelectCommand(device);
-                        break;
-                    case ["set", "bool" or "b", var option, var value]:
-                        SetBoolCommand(option, value);
-                        break;
-                    case ["set", "int" or "i", var option, var value]:
-                        SetIntCommand(option, value);
-                        break;
-                    case ["set", "float" or "f", var option, var value]:
-                        SetFloatCommand(option, value);
-                        break;
-                    case ["set", "index" or "x", var option, var value]:
-                        SetIndexCommand(option, value);
-                        break;
-                    case ["update"]:
-                        UpdateCommand();
-                        break;
-                    case ["clear"]:
-                        ClearCommand();
-                        break;
-                    case ["cls"]:
-                        ClearScreenCommand();
-                        break;
-                    case ["save", var stream, var fileName, var count]:
-                        CommandsEx.SaveCsv(this, stream, fileName, count);
-                        break;
-                    case ["save", var stream, var fileName]:
-                        CommandsEx.SaveCsv(this, stream, fileName, "1");
-                        break;
-                    case ["display", var stream, var count]:
-                        CommandsEx.SaveCsv(this, stream, null, count);
-                        break;
-                    case ["display", var stream]:
-                        CommandsEx.SaveCsv(this, stream, null, "1");
-                        break;
-                    case ["stats", var stream, var count]:
-                        CommandsEx.Stats(this, stream, count);
-                        break;
-                    case ["stats", var stream]:
-                        CommandsEx.Stats(this, stream, "1");
-                        break;
-                    case ["stop"]:
-                        StopCommand(Config.Device.ToString());
-                        break;
-                    case ["stop", "all"]:
-                        StopCommand("-1");
-                        break;
-                    case ["exit"]:
-                        Environment.Exit(0);
-                        return 0;
-                    case ["help" or "?"]:
-                        HelpCommand();
-                        break;
-                    case ["flush"]:
-                        FlushCommand();
-                        break;
-                    case ["random", var stream, var size, var frames]:
-                        CommandsEx.SendRandomDataCommand(this, Config.Device.ToString(), stream, size, frames);
-                        break;
-                    case ["random", var stream, var size]:
-                        CommandsEx.SendRandomDataCommand(this, Config.Device.ToString(), stream, size, "1");
-                        break;
-                    default:
-                        ErrorMessage("Invalid syntax. Try command 'help'.");
-                        break;
-                }
+                ProcessCommand(cmd);
             }
             catch (Exception ex)
             {
@@ -169,6 +117,113 @@ public class Client : IClient
 
     #region Basse Command handlers
 
+    private void TestCommand(string jsonPath, TestOperator op, string value)
+    {
+        if (LastResponseJson == null)
+        {
+            ErrorMessage("TEST FAILED: No JSON is available");
+            return;
+        }
+
+        var item = LastResponseJson.Value.SelectToken(jsonPath);
+
+        switch (item)
+        {
+            case string str:
+                switch (op)
+                {
+                    case TestOperator.Equals:
+                        TestResult(str == value, $"{jsonPath}: '{str}' == '{value}'");
+                        break;
+                    case TestOperator.LessThan:
+                        ErrorMessage($"{jsonPath}. Less-Than (<) is not valid for string values.");
+                        break;
+                    case TestOperator.MoreThan:
+                        ErrorMessage($"{jsonPath}. More-Than (>) is not valid for string values.");
+                        break;
+                    case TestOperator.Contains:
+                        TestResult(str.Contains(value), $"{jsonPath}: '{str}' contains '{value}'");
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(op), op, null);
+                }
+                break;
+            case double number:
+            {
+                if (!double.TryParse(value, CultureInfo.InvariantCulture, out var expected))
+                {
+                    TestResult(false, $"{jsonPath}. Unable to parse given '{value}' as an number.");
+                    break;
+                }
+
+                switch (op)
+                {
+                    case TestOperator.Equals:
+                        TestResult(number == expected, $"{jsonPath}: {number} == {expected}");
+                        break;
+                    case TestOperator.LessThan:
+                        TestResult(number < expected, $"{jsonPath}: {number} < {expected}");
+                        break;
+                    case TestOperator.MoreThan:
+                        TestResult(number > expected, $"{jsonPath}: {number} > {expected}");
+                        break;
+                    case TestOperator.Contains:
+                        ErrorMessage($"{jsonPath}. Contains is not valid for number values.");
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(op), op, null);
+                }
+
+                break;
+            }
+            case bool boolean:
+            {
+                switch (op)
+                {
+                    case TestOperator.Equals:
+                        if (!bool.TryParse(value, out var expected))
+                        {
+                            TestResult(false, $"{jsonPath}. Unable to parse given '{value}' as a boolean.");
+                            break;
+                        }
+                        TestResult(boolean == expected, $"{jsonPath}: {boolean} == {expected}");
+                        break;
+                    case TestOperator.LessThan:
+                        ErrorMessage($"{jsonPath}. Less-Than (<) does not work on boolean values.");
+                        break;
+                    case TestOperator.MoreThan:
+                        ErrorMessage($"{jsonPath}. More-Than (>) does not work on boolean values.");
+                        break;
+                    case TestOperator.Contains:
+                        ErrorMessage($"{jsonPath}. Contains does not work on boolean values.");
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(op), op, null);
+                }
+                break;
+            }
+            case null:
+                ErrorMessage($"{jsonPath}. Selected null value");
+                break;
+            case Array array:
+                ErrorMessage($"{jsonPath}. Target is an array. Use indexer syntax [index].");
+                break;
+            case var obj:
+                ErrorMessage($"{jsonPath}. Target is an object. Path must end with an leaf.");
+                break;
+        }
+    }
+
+    private void TestResult(bool success, string message)
+    {
+        _haveFailedTests |= !success;
+
+        if (success)
+            Console.WriteLine($"[PASSED] {message}");
+        else
+            Console.WriteLine($"[FAILED] {message}");
+    }
+
     private void HelpCommand()
     {
         WriteLine("Base Commands:");
@@ -177,8 +232,8 @@ public class Client : IClient
         WriteLine(" select <device>                        Select the specified device for subsequent commands.");
         WriteLine(" list all                               List all available devices.");
         WriteLine(" list                                   List the currently active device.");
-        WriteLine(" mode                                   Toggle JSON mode on or off for the application.");
-        WriteLine(" set bool <option> true|false           Set a boolean option on the selected device.");
+        WriteLine(" mode [text|json|silent]                Print format.");
+        WriteLine(" set bool <option> [true|false]         Set a boolean option on the selected device.");
         WriteLine(" set int <option> <value>               Set an integer option on the selected device.");
         WriteLine(" set float <option> <value>             Set a decimal (floating-point) option on the selected device.");
         WriteLine(" set index <option> <value>             Set an index option on the selected device.");
@@ -187,9 +242,11 @@ public class Client : IClient
         WriteLine(" stop                                   Stop all data streams on the selected device.");
         WriteLine(" stop all                               Stop all data streams on all connected devices.");
         WriteLine(" help                                   Display this help message.");
+        WriteLine(" reset                                  Send a board reset request. This will also close the connection,");
         WriteLine(" close                                  Close the connection to the board.");
         WriteLine(" flush                                  Wait for 1 second idle time. Useful for command scripts execution.");
         WriteLine(" exit                                   Exit the application.");
+        WriteLine(" test <json_path> <op> <value>          Test last output. <op> is one of == < > contains.");
         WriteLine("");
         WriteLine("Stream Commands:");
         WriteLine(" save <stream> <filename.csv> <frames>? Save a stream to a CSV file. Defaults to 1 frame if not specified.");
@@ -200,7 +257,6 @@ public class Client : IClient
         WriteLine("Use the up and down arrow keys to browse the command history.");
         WriteLine("");
     }
-
 
     private void ConnectTcpCommand(string host, string port)
     {
@@ -255,6 +311,19 @@ public class Client : IClient
     private void DisconnectCommand()
     {
         Close();
+    }
+
+    private void ResetCommand()
+    {
+        CheckConnected();
+
+        SendRequest(new Request { Reset = new ResetRequest { } });
+
+        _streamHandler.Clear();
+
+        Close();
+
+        Thread.Sleep(3000);
     }
 
     private void StopCommand(string deviceStr)
@@ -315,14 +384,14 @@ public class Client : IClient
             if (option.OptionId == optionId)
             {
                 option.OneofValue = indexValue;
-                if (_interactive)
+                if (Interactive)
                     WriteLine($"Updated previous value. Still {Config.Options.Count} pending.");
                 return;
             }
         }
 
         Config.Options.Add(new OptionValue { OptionId = optionId, OneofValue = indexValue });
-        if (_interactive)
+        if (Interactive)
             WriteLine($"{Config.Options.Count} update(s) pending with 'update' command.");
     }
 
@@ -345,13 +414,13 @@ public class Client : IClient
             if (option.OptionId == optionId)
             {
                 option.FloatValue = floatValue;
-                if (_interactive)
+                if (Interactive)
                     WriteLine($"Updated previous value. Still {Config.Options.Count} update(s) pending.");
                 return;
             }
         }
         Config.Options.Add(new OptionValue { OptionId = optionId, FloatValue = floatValue });
-        if (_interactive)
+        if (Interactive)
             WriteLine($"{Config.Options.Count} update(s) pending with 'update'.");
     }
 
@@ -374,14 +443,14 @@ public class Client : IClient
             if (option.OptionId == optionId)
             {
                 option.IntValue = intValue;
-                if (_interactive)
+                if (Interactive)
                     WriteLine($"Updated previous value. Still {Config.Options.Count} update(s) pending.");
                 return;
             }
         }
 
         Config.Options.Add(new OptionValue { OptionId = optionId, IntValue = intValue });
-        if (_interactive)
+        if (Interactive)
             WriteLine($"{Config.Options.Count} update(s) pending with 'update'.");
     }
 
@@ -404,13 +473,13 @@ public class Client : IClient
             if (option.OptionId == optionId)
             {
                 option.BoolValue = boolValue;
-                if (_interactive)
+                if (Interactive)
                     WriteLine($"Updated previous value. Still {Config.Options.Count} update(s) pending.");
                 return;
             }
         }
         Config.Options.Add(new OptionValue { OptionId = optionId, BoolValue = boolValue });
-        if (_interactive)
+        if (Interactive)
             WriteLine($"{Config.Options.Count} update(s) pending with 'update'.");
     }
     
@@ -422,9 +491,14 @@ public class Client : IClient
 
     private void UpdateCommand()
     {
+        _lastTimestamp = default;
+
         CheckConnected();
         SendRequest(new Request { Config = Config });
         Config.Options.Clear();
+
+        if (!Interactive)
+            FlushCommand();
     }
 
     private void ListCommand(string device)
@@ -438,22 +512,25 @@ public class Client : IClient
         }
 
         SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = deviceId } });
+
+        if (!Interactive)
+            FlushCommand();
     }
 
-    private void FlushCommand()
+    public void FlushCommand()
     {
-        _lastTimestamp = DateTime.UtcNow + TimeSpan.FromSeconds(1);
-        while (DateTime.UtcNow - _lastTimestamp < TimeSpan.FromSeconds(1))
+        while (_lastTimestamp == default || _streamHandler.Count > 0)
         {
             Thread.Sleep(10);
         }
     }
 
-    private void ToggleModeCommand()
+    private void SetModeCommand(PrintMode mode)
     {
-        _jsonOutputFormat = !_jsonOutputFormat;
-        if(_interactive)
-            WriteLine($"JSON responses is now {(_jsonOutputFormat ? "ON" : "OFF")}");
+        PrintMode = mode;
+
+        if(Interactive)
+            WriteLine($"Print responses as {PrintMode}");
     }
 
     private void ClearScreenCommand()
@@ -484,7 +561,7 @@ public class Client : IClient
         ClearCurrentConsoleLine();
         Console.Error.WriteLine(message);
 
-        if (!_interactive)
+        if (!Interactive)
             Environment.Exit(-1);
     }
 
@@ -505,6 +582,168 @@ public class Client : IClient
     #endregion
 
     #region Private helpers
+
+    private void StartThreads()
+    {
+        // Start receive thread that print response messages
+        var receiveThread = new Thread(ReceiveThreadHandler);
+        receiveThread.Start();
+
+        // Watchdog thread that sends watchdog reset messages periodically
+        var watchdogThread = new Thread(WatchDogThreadHandler);
+        watchdogThread.Start();
+    }
+
+    private void ProcessCommand(string command)
+    {
+        switch (SplitCmd(command))
+        {
+            case null or [] or [""]:
+                break;
+            case ["connect" or "open", "tcp"]:
+                ConnectTcpCommand(DefaultTcpHost, DefaultTcpPort.ToString());
+                break;
+            case ["connect" or "open", "tcp", var host, var port]:
+                ConnectTcpCommand(host, port);
+                break;
+            case ["connect" or "open", "serial"]:
+                ConnectSerialCommand(DefaultComPort);
+                break;
+            case ["connect" or "open", "serial", var port]:
+                ConnectSerialCommand(port);
+                break;
+            case ["disconnect" or "close"]:
+                DisconnectCommand();
+                break;
+            case ["list" or "ls", "all"]:
+                ListCommand("-1");
+                break;
+            case ["list" or "ls"]:
+                ListCommand(Config.Device.ToString());
+                break;
+            case ["mode", "silent"]:
+                SetModeCommand(PrintMode.Silent);
+                break;
+            case ["mode", "json"]:
+                SetModeCommand(PrintMode.Json);
+                break;
+            case ["mode", "text"]:
+                SetModeCommand(PrintMode.Text);
+                break;
+            case ["select", var device]:
+                SelectCommand(device);
+                break;
+            case ["set", "bool" or "b", var option, var value]:
+                SetBoolCommand(option, value);
+                break;
+            case ["set", "int" or "i", var option, var value]:
+                SetIntCommand(option, value);
+                break;
+            case ["set", "float" or "f", var option, var value]:
+                SetFloatCommand(option, value);
+                break;
+            case ["set", "index" or "x", var option, var value]:
+                SetIndexCommand(option, value);
+                break;
+            case ["update"]:
+                UpdateCommand();
+                break;
+            case ["clear"]:
+                ClearCommand();
+                break;
+            case ["cls"]:
+                ClearScreenCommand();
+                break;
+            case ["save", var stream, var fileName, var count]:
+                CommandsEx.SaveCsv(this, stream, fileName, count);
+                break;
+            case ["save", var stream, var fileName]:
+                CommandsEx.SaveCsv(this, stream, fileName, "1");
+                break;
+            case ["display", var stream, var count]:
+                CommandsEx.SaveCsv(this, stream, null, count);
+                break;
+            case ["display", var stream]:
+                CommandsEx.SaveCsv(this, stream, null, "1");
+                break;
+            case ["stats", var stream, var count]:
+                CommandsEx.Stats(this, stream, count);
+                break;
+            case ["stats", var stream]:
+                CommandsEx.Stats(this, stream, "1");
+                break;
+            case ["reset"]:
+                ResetCommand();
+                break;
+            case ["stop"]:
+                StopCommand(Config.Device.ToString());
+                break;
+            case ["stop", "all"]:
+                StopCommand("-1");
+                break;
+            case ["exit"]:
+                Environment.Exit(0);
+                break;
+            case ["help" or "?"]:
+                HelpCommand();
+                break;
+            case ["flush"]:
+                FlushCommand();
+                break;
+            case ["random", var stream, var size, var frames]:
+                CommandsEx.SendRandomDataCommand(this, Config.Device.ToString(), stream, size, frames);
+                break;
+            case ["random", var stream, var size]:
+                CommandsEx.SendRandomDataCommand(this, Config.Device.ToString(), stream, size, "1");
+                break;
+
+            case ["test", var jsonPath, "==", var value]:
+                TestCommand(jsonPath, TestOperator.Equals, value);
+                break;
+
+            case ["test", var jsonPath, ">", var value]:
+                TestCommand(jsonPath, TestOperator.MoreThan, value);
+                break;
+
+            case ["test", var jsonPath, "<", var value]:
+                TestCommand(jsonPath, TestOperator.LessThan, value);
+                break;
+
+            case ["test", var jsonPath, "contains", var value]:
+                TestCommand(jsonPath, TestOperator.Contains, value);
+                break;
+
+            default:
+                ErrorMessage("Invalid syntax. Try command 'help'.");
+                break;
+        }
+    }
+
+    private static string[]? SplitCmd(string? input)
+    {
+        if (String.IsNullOrWhiteSpace(input))
+            return null;
+
+        // Remove everything after "//"
+        int commentIndex = input.LastIndexOf("//", StringComparison.InvariantCulture);
+        if (commentIndex >= 0)
+            input = input.Substring(0, commentIndex);
+
+        var tokens = new List<string>();
+
+        // Regular expression to match quoted strings and unquoted tokens
+        // Matches: sequences between quotes, or sequences of non-space characters
+        var regex = new Regex(@"(""[^""]*"")|('[^']*')|(\S+)");
+
+
+        var matches = regex.Matches(input);
+        foreach (Match match in matches)
+        {
+            tokens.Add(match.Value.Trim('\'', '\"'));
+        }
+
+        return tokens.ToArray();
+    }
 
     private void Close()
     {
@@ -528,6 +767,8 @@ public class Client : IClient
     [DoesNotReturn]
     private void ReceiveThreadHandler()
     {
+        JsonFormatter formatter = new JsonFormatter(JsonFormatter.Settings.Default.WithIndentation());
+
         while (true)
         {
             // Wait for a connection
@@ -545,8 +786,6 @@ public class Client : IClient
                     response = Response.Parser.ParseDelimitedFrom(_stream);
                 }
 
-                _lastTimestamp = DateTime.UtcNow;
-
                 switch (response.ResponseTypeCase)
                 {
                     case Response.ResponseTypeOneofCase.None:
@@ -563,28 +802,31 @@ public class Client : IClient
                             {
                                 var key = new StreamKey(device.DeviceId, index++);
 
-                                if(_streamHandler.TryGetValue(key, out var handler))
+                                if (_streamHandler.TryGetValue(key, out var handler))
                                     handler.Start(stream);
                             }
                         }
 
                         if (response.Capabilities.Tag != -1)
                         {
-                            if (_jsonOutputFormat)
+                            string jsonText = formatter.Format(response);
+                            LastResponseJson = JsonDocument.Parse(jsonText)?.RootElement;
+                            _lastTimestamp = DateTime.UtcNow;
+                            switch (PrintMode)
                             {
-                                JsonFormatter formatter = new JsonFormatter(JsonFormatter.Settings.Default.WithIndentation());
-                                WriteLine(formatter.Format(response));
-                            }
-                            else
-                            {
-                                WriteLine(response.Capabilities.Format());
+                                case PrintMode.Text:
+                                    WriteLine(response.Capabilities.Format());
+                                    break;
+                                case PrintMode.Json:
+                                    WriteLine(jsonText);
+                                    break;
                             }
                         }
 
                         if (response.Capabilities.Board.WatchdogTimeout != (int)_watchDogReset.TotalMilliseconds)
                         {
                             _watchDogReset = TimeSpan.FromMilliseconds(response.Capabilities.Board.WatchdogTimeout);
-                            if(_interactive)
+                            if (Interactive)
                                 WriteLine($"Watchdog updated to {_watchDogReset}");
                         }
 
@@ -603,14 +845,17 @@ public class Client : IClient
 
                         if (response.Config.Tag != -1)
                         {
-                            if (_jsonOutputFormat)
+                            string jsonText = formatter.Format(response);
+                            LastResponseJson = JsonDocument.Parse(jsonText)?.RootElement;
+                            _lastTimestamp = DateTime.UtcNow;
+                            switch (PrintMode)
                             {
-                                JsonFormatter formatter = new JsonFormatter(JsonFormatter.Settings.Default.WithIndentation());
-                                WriteLine(formatter.Format(response));
-                            }
-                            else
-                            {
-                                WriteLine(response.Config.Format());
+                                case PrintMode.Text:
+                                    WriteLine(response.Config.Format());
+                                    break;
+                                case PrintMode.Json:
+                                    WriteLine(jsonText);
+                                    break;
                             }
                         }
 
@@ -618,15 +863,17 @@ public class Client : IClient
                     }
                     case Response.ResponseTypeOneofCase.Error:
                     {
-                        if (_jsonOutputFormat)
+                        string jsonText = formatter.Format(response);
+                        LastResponseJson = JsonDocument.Parse(jsonText)?.RootElement;
+                        _lastTimestamp = DateTime.UtcNow;
+                        switch (PrintMode)
                         {
-                            JsonFormatter formatter =
-                                new JsonFormatter(JsonFormatter.Settings.Default.WithIndentation());
-                            WriteLine(formatter.Format(response));
-                        }
-                        else
-                        {
-                            WriteLine(response.Error.Format());
+                            case PrintMode.Text:
+                                WriteLine(response.Error.Format());
+                                break;
+                            case PrintMode.Json:
+                                WriteLine(jsonText);
+                                break;
                         }
 
                         break;
@@ -638,6 +885,7 @@ public class Client : IClient
                         {
                             if (!handler.ProcessDataChunk(response.Data))
                             {
+                                _lastTimestamp = DateTime.UtcNow;
                                 _streamHandler.Remove(key);
                                 SendRequest(new Request { Stop = new StopRequest { Device = key.DeviceId } });
                             }
@@ -649,14 +897,14 @@ public class Client : IClient
                         throw new ArgumentOutOfRangeException();
                 }
 
-                if (_interactive && Config.Options.Any())
+                if (Interactive && Config.Options.Any())
                     WriteLine($"NOTE! Listing is not updated. There are {Config.Options.Count} update(s) pending 'update' command.");
 
                 PrintPrompt();
             }
             catch (Exception ex)
             {
-                if(_stream != null)
+                if (_stream != null)
                     ErrorMessage($"Exception: {ex.Message}");
             }
         }
@@ -698,7 +946,7 @@ public class Client : IClient
 
     private void ClearCurrentConsoleLine()
     {
-        if (!_interactive)
+        if (!Interactive)
             return;
 
         int currentLineCursor = Console.CursorTop;
@@ -709,7 +957,7 @@ public class Client : IClient
 
     private void PrintPrompt()
     {
-        if(!_interactive)
+        if(!Interactive)
             return;
 
         if (Console.CursorLeft != 0)

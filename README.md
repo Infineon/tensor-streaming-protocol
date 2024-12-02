@@ -4,6 +4,7 @@ Tensor Streaming Protocol defines a streaming mechanism used for communication b
 This protocol is designed to handle multiple data streams from sensors, models, and playback devices, enabling efficient data transfer and processing in embedded systems.
 
 A single board can have multiple devices, each device capable of handling multiple input and output data streams. For instance:
+
 - Sensors typically have one output stream.
 - Models have at least one input and one output stream.
 - Playback devices commonly have one input stream.
@@ -24,6 +25,51 @@ In addition to the protobuf, a helper API is defined in [protocol.h](source/prot
     ├── python-example-client   - Example client written in python 
     └── tcp-demo-server         - TCP demo implementation of the protocol
 ```
+
+## Terminology 
+
+- **Board**: A hardware platform containing one or more devices.
+- **Device**: A component on a board that can produce or consume data. For instance: sensors, playback devices, models.
+- **Client**: An application that connects to a board via TCP, UDP, serial port, or Bluetooth to interact with devices.
+- **Stream**: A data channel that can either send data (Output) or receive data (Input). Streams are associated with devices.
+- **Frame**: A unit of data sent periodically over a stream, in the form of a tensor.
+- **Tensor**: A multidimensional array used to represent data. The number of dimensions are referred to as rank.
+- **Shape**: The size of each dimension in a tensor. For example, `[640, 480, 3]` represents the shape of a video frame.
+
+## Protocol Session Example
+
+The following steps outline a typical session between a client and a board using the Tensor Streaming Protocol:
+
+1. **<= BoardCapabilitiesRequest**
+
+    - The client sends a `BoardCapabilitiesRequest` message to inquire about the device capabilities on the board.
+
+2. **=> BoardCapabilitiesResponse**
+
+    - The board responds with a `BoardCapabilitiesResponse` message detailing the available devices and their capabilities.
+    - If the response includes a `watchdog_timeout`, the client must periodically send `WatchdogResetRequest` messages to prevent the board from resetting.
+   
+3. **<= WatchdogResetRequest**
+
+    - Resets the watchdog timer on the board. This request should be sent at intervals specified by `watchdog_timeout`.
+   
+For each device of interest:
+
+4. **<= DeviceConfigurationRequest**
+
+    - Configures the specified device with the desired options. This request prompts a `DeviceConfigurationResponse` from the board.
+
+5. **=> DeviceConfigurationResponse**
+
+    - The board responds with a `DeviceConfigurationResponse` message describing the configured data streams and their properties.
+
+6. **<= StartRequest**
+
+    - The client sends a `StartRequest` to initiate data streaming for the specified device.
+
+7. **=> DataChunk**
+
+    - The board streams data in `DataChunk` messages for each active subscription.
 
 
 ### tcp-demo-server
@@ -76,74 +122,112 @@ On Ubuntu Linux:
     dotnet run
     ```
 
-#### Run command script
+#### Run test script
 
-For scripting -i option may be used.
+For scripted tests the `--test` option can be used. 
+Replace path/to/test/file.test with the actual path to your test file.
+See example below.
 
 ```sh
-cd source/DotNetCli
+dotnet run --test path/to/test/file.test
+```
 
-cat << EOF > commands.txt
+#### Example Test File (DPS.test)
+
+```
+# Reset the board
 open serial COM5
-set bool 20 true
-update
-flush
-save 0 foobar.csv 16000
-flush
-exit
-EOF
+reset
+# Reconnect
+open serial COM5
 
-cat commands.txt | dotnet run -i
+# Silent mode. Change to 'mode json' to see the JSON for tests below.
+mode silent
+
+# Select device 4
+select 4
+list 
+
+# Check that device 4 is the DPS sensor
+test capabilities.board.devices[0].name contains "DPS"
+
+# Check that option id=1 is Frequency with values 8,16,32,64,128
+test capabilities.board.devices[0].options[0].optionId == 1
+test capabilities.board.devices[0].options[0].name == "Frequency"
+test capabilities.board.devices[0].options[0].oneofType.items[0] == "8 Hz"
+test capabilities.board.devices[0].options[0].oneofType.items[1] == "16 Hz"
+test capabilities.board.devices[0].options[0].oneofType.items[2] == "32 Hz"
+test capabilities.board.devices[0].options[0].oneofType.items[3] == "64 Hz"
+test capabilities.board.devices[0].options[0].oneofType.items[4] == "128 Hz"
+
+####################### 8 Hz TEST #######################
+
+# Set frequency to 8 Hz
+set index 1 0
+update
+
+# Check that the stream is what we expect
+test config.streams[0].frequency == 8
+test config.statusMessage contains "ready"
+ 
+# Collect 8 frames @ 8Hz from stream 0
+stats 0 8
+test DroppedFramesDevice == 0
+test MeasuredTimeError < 50
+test Statistics[0].Name == "Pressure"
+test Statistics[0].Maximum < 1040
+test Statistics[0].Minimum > 700
+test Statistics[1].Name == "Temp"
+test Statistics[1].Maximum < 40
+test Statistics[1].Minimum > 20
+
+####################### 16 Hz TEST #######################
+
+# Set frequency to 16 Hz
+set index 1 1
+update
+
+# Check that the stream is what we expect
+test config.streams[0].frequency == 16
+test config.statusMessage contains "ready"
+ 
+# Collect 16 frames @ 16Hz from stream 0
+stats 0 16
+test DroppedFramesDevice == 0
+test MeasuredTimeError < 50
+test Statistics[0].Name == "Pressure"
+test Statistics[0].Maximum < 1040
+test Statistics[0].Minimum > 700
+test Statistics[1].Name == "Temp"
+test Statistics[1].Maximum < 40
+test Statistics[1].Minimum > 20
+
+####################### 32 Hz TEST #######################
+
+# Set frequency to 32 Hz
+set index 1 2
+update
+
+# Check that the stream is what we expect
+test config.streams[0].frequency == 32
+test config.statusMessage contains "ready"
+ 
+# Collect 32 frames @ 32Hz from stream 0
+stats 0 32
+test DroppedFramesDevice == 0
+test MeasuredTimeError < 50
+test Statistics[0].Name == "Pressure"
+test Statistics[0].Maximum < 1040
+test Statistics[0].Minimum > 700
+test Statistics[1].Name == "Temp"
+test Statistics[1].Maximum < 40
+test Statistics[1].Minimum > 20
+
 ```
 
 ### python-example-client
 
 See [README.md](source/python-example-client) in source/python-example-client
-
-## Terminology 
-
-- **Board**: A hardware platform containing one or more devices.
-- **Device**: A component on a board that can produce or consume data. For instance: sensors, playback devices, models.
-- **Client**: An application that connects to a board via TCP, UDP, serial port, or Bluetooth to interact with devices.
-- **Stream**: A data channel that can either send data (Output) or receive data (Input). Streams are associated with devices.
-- **Frame**: A unit of data sent periodically over a stream, in the form of a tensor.
-- **Tensor**: A multidimensional array used to represent data. The number of dimensions are referred to as rank.
-- **Shape**: The size of each dimension in a tensor. For example, `[640, 480, 3]` represents the shape of a video frame.
-
-## Protocol Session Example
-
-The following steps outline a typical session between a client and a board using the Tensor Streaming Protocol:
-
-1. **<= BoardCapabilitiesRequest**
-
-    - The client sends a `BoardCapabilitiesRequest` message to inquire about the device capabilities on the board.
-
-2. **=> BoardCapabilitiesResponse**
-
-    - The board responds with a `BoardCapabilitiesResponse` message detailing the available devices and their capabilities.
-    - If the response includes a `watchdog_timeout`, the client must periodically send `WatchdogResetRequest` messages to prevent the board from resetting.
-   
-3. **<= WatchdogResetRequest**
-
-    - Resets the watchdog timer on the board. This request should be sent at intervals specified by `watchdog_timeout`.
-   
-For each device of interest:
-
-4. **<= DeviceConfigurationRequest**
-
-    - Configures the specified device with the desired options. This request prompts a `DeviceConfigurationResponse` from the board.
-
-5. **=> DeviceConfigurationResponse**
-
-    - The board responds with a `DeviceConfigurationResponse` message describing the configured data streams and their properties.
-
-6. **<= StartRequest**
-
-    - The client sends a `StartRequest` to initiate data streaming for the specified device.
-
-7. **=> DataChunk**
-
-    - The board streams data in `DataChunk` messages for each active subscription.
 
 ## Instructions for Registering a Device to the Protocol (Example)
 

@@ -45,9 +45,9 @@ extern "C" {
 
 #define PROTOCOL_VERSION \
 (protocol_Version) {     \
-    major: 1,            \
-    minor: 4,            \
-    build: 20241108,     \
+    major: 2,            \
+    minor: 1,            \
+    build: 20241201,     \
     revision: 0          \
 }
 
@@ -91,6 +91,7 @@ typedef void (*protocol_device_poll_fn)(protocol_t* protocol, int device, pb_ost
 typedef bool (*protocol_data_received)(protocol_t* protocol, protocol_DataChunk *msg, pb_istream_t* istream, void* arg);
     
 typedef void (*protocol_watchdog_reset_fn)(protocol_t* protocol);
+typedef void (*protocol_board_reset_fn)(protocol_t* protocol);
 
 /*
 * Callback for writing payload.
@@ -197,6 +198,11 @@ typedef struct protocol_s {
     * Called when a WatchdogResetRequest message is received.
     */
     protocol_watchdog_reset_fn watchdog_reset;
+
+    /*
+    * Called when a ResetRequest message is received.
+    */
+    protocol_board_reset_fn board_reset;
 } protocol_t;
 
 /******************************************************************************
