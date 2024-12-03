@@ -122,24 +122,35 @@ On Ubuntu Linux:
     dotnet run
     ```
 
+```
+Usage: dotnet run [OPTIONS]
+  -h, --help                       This help.
+  -t, --test <file.test>           Execute test script. If any test fails. Return code will be -1
+  -sp, --serial-port <com_port>    Set default port to use. On windows this should be COMn, on linux /dev/ttySn
+  -sb, --serial-baud <baud_rate>   Baud rate to use for serial port
+  -th, --tcp-host <host>           Sets default TCP host.
+  -tp, --tcp-port <port>           Sets default TCP port.
+```
+
 #### Run test script
 
 For scripted tests the `--test` option can be used. 
 Replace path/to/test/file.test with the actual path to your test file.
+Replace COM5 with your port, on linux use `/dev/ttySn`
 See example below.
 
 ```sh
-dotnet run --test path/to/test/file.test
+dotnet run --test path/to/test/file.test --serial-port COM5
 ```
 
 #### Example Test File (DPS.test)
 
 ```
 # Reset the board
-open serial COM5
+open serial
 reset
 # Reconnect
-open serial COM5
+open serial
 
 # Silent mode. Change to 'mode json' to see the JSON for tests below.
 mode silent

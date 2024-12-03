@@ -29,5 +29,6 @@ public interface IClient
     public void ErrorMessage(string message);
 
     public void WriteLine(string message);
-    public void FlushCommand();
+
+    public void Flush();
 }

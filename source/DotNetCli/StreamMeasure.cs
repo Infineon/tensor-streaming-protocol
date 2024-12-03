@@ -190,7 +190,7 @@ internal class StreamMeasure : StreamHandlerBase
 
         var jsonObject = new Dictionary<string, object>
         {
-            {"StreamName", Stream?.Name},
+            {"StreamName", Stream?.Name ?? ""},
             {"MeasuredTimeError", _maxTimeDelta.TotalMilliseconds},
             {"ReceivedChunks", _chunksReceived},
             {"ReceivedFrames", _framesReceived},

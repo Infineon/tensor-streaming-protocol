@@ -19,10 +19,10 @@ enum TestOperator
 
 public class Client : IClient
 {
-    private const int DefaultTcpPort = 12345;
-    private const string DefaultTcpHost = "localhost";
-    private const string DefaultComPort = "COM5";
-    private const int SerialPortBaud = 115200; // 256000 also works for windows
+    public int DefaultTcpPort = 12345;
+    public string DefaultTcpHost = "localhost";
+    public string DefaultComPort = "COM5";
+    public int SerialPortBaud = 115200; // 256000 also works for windows
 
     // If not 0, a watchdog reset message will be sent.
     private TimeSpan _watchDogReset = TimeSpan.Zero;
@@ -51,7 +51,7 @@ public class Client : IClient
     // If true, output will be printed as raw JSON
     public PrintMode PrintMode { get; private set; }
 
-    // False if -i or -t startup argument was passed, else true.
+    // False if -t startup argument was passed, else true.
     // This will hide the prompt and only print outputs.
     // On any error the application will exit with -1.
     // Useful when used in scripts. 
@@ -89,9 +89,9 @@ public class Client : IClient
         return 0;
     }
 
-    public int Run(bool interactive)
+    public int RunInteractive()
     {
-        Interactive = interactive;
+        Interactive = true;
 
         StartThreads();
 
@@ -212,16 +212,6 @@ public class Client : IClient
                 ErrorMessage($"{jsonPath}. Target is an object. Path must end with an leaf.");
                 break;
         }
-    }
-
-    private void TestResult(bool success, string message)
-    {
-        _haveFailedTests |= !success;
-
-        if (success)
-            Console.WriteLine($"[PASSED] {message}");
-        else
-            Console.WriteLine($"[FAILED] {message}");
     }
 
     private void HelpCommand()
@@ -519,10 +509,7 @@ public class Client : IClient
 
     public void FlushCommand()
     {
-        while (_lastTimestamp == default || _streamHandler.Count > 0)
-        {
-            Thread.Sleep(10);
-        }
+        Flush();
     }
 
     private void SetModeCommand(PrintMode mode)
@@ -576,6 +563,14 @@ public class Client : IClient
         lock (_streamWriteLock)
         {
             request.WriteDelimitedTo(_stream);
+        }
+    }
+
+    public void Flush()
+    {
+        while (_lastTimestamp == default || _streamHandler.Count > 0)
+        {
+            Thread.Sleep(10);
         }
     }
 
@@ -937,7 +932,7 @@ public class Client : IClient
 
                 SendRequest(new Request { WatchdogReset = new WatchdogResetRequest() });
             }
-            catch (Exception ex)
+            catch
             {
                 Close();
             }
@@ -967,6 +962,24 @@ public class Client : IClient
         else
             Console.Write($"(device {Config.Device})$ ");
     }
+
+    private void TestResult(bool success, string message)
+    {
+        _haveFailedTests |= !success;
+
+        if (success)
+        {
+            Console.WriteLine($"[PASSED] {message}");
+        }
+        else
+        {
+            var defaultColor = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[FAILED] {message}");
+            Console.ForegroundColor = defaultColor;
+        }
+    }
+
 
     #endregion
 }

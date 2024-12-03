@@ -35,14 +35,14 @@ internal static class CommandsEx
         client.SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = client.Config.Device, Tag = -1} });
 
         if (!client.Interactive)
-            client.FlushCommand();
+            client.Flush();
 
         client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
 
         client.AddStreamHandler(client.Config.Device, streamId, new StreamMeasure(client, frameCount));
 
         if (!client.Interactive)
-            client.FlushCommand();
+            client.Flush();
     }
 
     public static void SaveCsv(IClient client, string streamStr, string? fileName, string framesStr)
@@ -70,14 +70,14 @@ internal static class CommandsEx
         client.SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = client.Config.Device, Tag = -1 } });
 
         // Need to wait for the response here
-        client.FlushCommand();
+        client.Flush();
 
         client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
 
         client.AddStreamHandler(client.Config.Device, streamId, new CsvWriter(client, frameCount, fileName));
 
         if (!client.Interactive)
-            client.FlushCommand();
+            client.Flush();
     }
 
     public static void SendRandomDataCommand(IClient client, string deviceStr, string streamStr, string sizeStr, string framesStr)

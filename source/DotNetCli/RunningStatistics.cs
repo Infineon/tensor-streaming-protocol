@@ -274,7 +274,7 @@ public class RunningStatistics : IEquatable<RunningStatistics>
     /// <param name="other">An object to compare with this object.</param>
     /// <returns>
     /// <see langword="true" /> if the current object is equal to the <paramref name="other" /> parameter; otherwise, <see langword="false" />.</returns>
-    public bool Equals(RunningStatistics other)
+    public bool Equals(RunningStatistics? other)
     {
         if (ReferenceEquals(null, other)) return false;
         if (ReferenceEquals(this, other)) return true;
@@ -285,7 +285,7 @@ public class RunningStatistics : IEquatable<RunningStatistics>
     /// <param name="obj">The object to compare with the current object.</param>
     /// <returns>
     /// <see langword="true" /> if the specified object  is equal to the current object; otherwise, <see langword="false" />.</returns>
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         if (ReferenceEquals(null, obj)) return false;
         if (ReferenceEquals(this, obj)) return true;
