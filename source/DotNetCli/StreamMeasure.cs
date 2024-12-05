@@ -7,6 +7,7 @@ internal class StreamMeasure : StreamHandlerBase
 {
     private readonly RunningStatistics _statisticsTotal;
     private List<RunningStatistics>? _statistics;
+    private DateTime? _startTime;
     private DateTime? _prevTime;
     private int _currentFrameNumber;
     private int _framesReceived;
@@ -14,6 +15,7 @@ internal class StreamMeasure : StreamHandlerBase
     private int _totalDropped;
     private int _chunksReceived;
     private TimeSpan _maxTimeDelta;
+    private TimeSpan _clockDrift;
     private IClient _client;
 
     public StreamMeasure(IClient client, int count) : base(client)
@@ -22,6 +24,7 @@ internal class StreamMeasure : StreamHandlerBase
         _client = client;
         _statisticsTotal = new();
         _maxTimeDelta = TimeSpan.Zero;
+        _clockDrift = TimeSpan.Zero;
     }
 
     public override void Start(StreamConfig stream)
@@ -30,7 +33,8 @@ internal class StreamMeasure : StreamHandlerBase
 
         var estimated = TimeSpan.FromSeconds(_framesLeft / stream.Frequency);
 
-        if (ElementCount < 9)
+        // If there are 9 or less elements, collect stats for feature each individually  
+        if (ElementCount <= 9)
         {
             _statistics = new List<RunningStatistics>(ElementCount);
             for (int i = 0; i < ElementCount; i++)
@@ -47,8 +51,8 @@ internal class StreamMeasure : StreamHandlerBase
         if (Stream == null)
             return false;
 
-        var now = DateTime.UtcNow;
-        _prevTime ??= now;
+        var now = DateTime.UtcNow; 
+        _startTime ??= now;
 
         _chunksReceived++;
         _framesReceived += data.FrameCount;
@@ -56,24 +60,31 @@ internal class StreamMeasure : StreamHandlerBase
         int expectedTotal = data.FrameCount * ElementSize * ElementCount;
         if (data.Payload.Span.Length != expectedTotal)
         {
-            Client.ErrorMessage(
-                $"Unexpected payload size of {data.Payload.Span.Length} bytes. Expected {expectedTotal} bytes.");
+            Client.ErrorMessage($"Unexpected payload size of {data.Payload.Span.Length} bytes. Expected {expectedTotal} bytes.");
             return false;
         }
 
         var dropped = data.FrameNumber - _currentFrameNumber;
 
-        var delta = now - _prevTime.Value;
-        _prevTime = now;
+        // if (dropped != 0)
+        //    Client.WriteLine($"Dropped {dropped} frames.");
         
-        if (data.FrameNumber != 0)
-            delta -= TimeSpan.FromSeconds(1 / (double)Stream.Frequency);
-        
+        var startDelta = now - _startTime.Value;
+
+        if(startDelta > TimeSpan.Zero)
+            _clockDrift = startDelta - TimeSpan.FromSeconds((data.FrameNumber + data.FrameCount) / (double)Stream.Frequency);
+
+        TimeSpan delta = TimeSpan.Zero;
+        if (_prevTime.HasValue)
+        {
+            delta = ((now - _prevTime.Value) - TimeSpan.FromSeconds((dropped + data.FrameCount) / (double)Stream.Frequency)).Duration();
+            if (delta > _maxTimeDelta)
+                _maxTimeDelta = delta;
+        }
+
         // WriteLine($"Chunk {_chunksReceived}: Measured Error {(int)delta.TotalMilliseconds} milliseconds. Frames: {data.FrameCount} Dropped: {dropped}");
 
-        if (delta.Duration() > _maxTimeDelta)
-            _maxTimeDelta = delta.Duration();
-
+        _prevTime = now;
         _currentFrameNumber = data.FrameNumber + data.FrameCount;
         _totalDropped += dropped;
         if (_framesLeft > 0)
@@ -134,8 +145,6 @@ internal class StreamMeasure : StreamHandlerBase
         Client.WriteLine(header.PadRight(30) + " " + value);
     }
 
-   
-
     private void PrintStatisticsText()
     {
         int bytesReceived = ElementSize * ElementCount * _framesReceived;
@@ -143,7 +152,8 @@ internal class StreamMeasure : StreamHandlerBase
 
         WriteLine("");
         WriteLine($"--- Statistics for Stream {Stream?.Name} ---");
-        WriteLine("Measured Time Error", (int)_maxTimeDelta.TotalMilliseconds + " milliseconds");
+        WriteLine("Max Chunk Arrival Error", (int)_maxTimeDelta.TotalMilliseconds + " milliseconds");   // Max chunk arrival time error
+        WriteLine("Clock Drift", (int)_clockDrift.TotalMilliseconds + " milliseconds");             // Time error between first and last chunk
         WriteLine("Received", $"{_chunksReceived:N0} chunks / {_framesReceived:N0} frames / {bytesReceived:N0} bytes");
         WriteLine("Sampled", $"{framesAnalyzed:N0} frames");
         WriteLine("Average Frames in Chunk", _framesReceived / (float)_chunksReceived);
@@ -191,7 +201,9 @@ internal class StreamMeasure : StreamHandlerBase
         var jsonObject = new Dictionary<string, object>
         {
             {"StreamName", Stream?.Name ?? ""},
-            {"MeasuredTimeError", _maxTimeDelta.TotalMilliseconds},
+            {"MaxChunkArrivalError", _maxTimeDelta.TotalMilliseconds},      // Max chunk arrival time error
+            {"ClockDrift", _clockDrift.TotalMilliseconds},                  // Time error between first and last chunk
+            {"AsbClockDrift", _clockDrift.Duration().TotalMilliseconds},    // Absolute time error between first and last chunk
             {"ReceivedChunks", _chunksReceived},
             {"ReceivedFrames", _framesReceived},
             {"ReceivedBytes", bytesReceived},
