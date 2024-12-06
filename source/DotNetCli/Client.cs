@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO.Ports;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Google.Protobuf;
@@ -42,6 +43,9 @@ public class Client : IClient
     // Download target streams
     private readonly Dictionary<StreamKey, IStreamHandler> _streamHandler = new();
 
+    // Functions
+    private readonly Dictionary<string, string[]> _functions = new();
+
     // Holds the current request.
     public DeviceConfigurationRequest Config { get; private set; } = new();
 
@@ -68,14 +72,12 @@ public class Client : IClient
 
         try
         {
-            foreach (var cmd in scriptLines)
+            for (var index = 0; index < scriptLines.Length; index++)
             {
-                if (cmd.StartsWith("#"))
-                {
-                    Console.WriteLine(cmd);
+                if (ParseFunction(scriptLines, ref index)) 
                     continue;
-                }
 
+                var cmd = scriptLines[index].Trim();
                 ProcessCommand(cmd);
             }
         }
@@ -237,6 +239,7 @@ public class Client : IClient
         WriteLine(" flush                                  Wait for 1 second idle time. Useful for command scripts execution.");
         WriteLine(" exit                                   Exit the application.");
         WriteLine(" test <json_path> <op> <value>          Test last output. <op> is one of == < > contains.");
+        WriteLine(" call <function>                        Call a user declared function.");
         WriteLine("");
         WriteLine("Stream Commands:");
         WriteLine(" save <stream> <filename.csv> <frames>? Save a stream to a CSV file. Defaults to 1 frame if not specified.");
@@ -525,6 +528,17 @@ public class Client : IClient
         Console.Clear();
     }
 
+    private void CallCommand(string functionName)
+    {
+        if (_functions.TryGetValue(functionName, out var bodyLines))
+        {
+            foreach (var line in bodyLines)
+            {
+                ProcessCommand(line);
+            }
+        }
+    }
+
     #endregion
 
     #region Public Methods (IClient)
@@ -591,6 +605,12 @@ public class Client : IClient
 
     private void ProcessCommand(string command)
     {
+        if (command.StartsWith("#"))
+        {
+            Console.WriteLine(command);
+            return;
+        }
+
         switch (SplitCmd(command))
         {
             case null or [] or [""]:
@@ -706,6 +726,10 @@ public class Client : IClient
 
             case ["test", var jsonPath, "contains", var value]:
                 TestCommand(jsonPath, TestOperator.Contains, value);
+                break;
+
+            case ["call", var functionName]:
+                CallCommand(functionName);
                 break;
 
             default:
@@ -901,6 +925,8 @@ public class Client : IClient
             {
                 if (_stream != null)
                     ErrorMessage($"Exception: {ex.Message}");
+
+                Thread.Sleep(100);
             }
         }
     }
@@ -935,6 +961,7 @@ public class Client : IClient
             catch
             {
                 Close();
+                Thread.Sleep(100);
             }
         }
     }
@@ -978,6 +1005,36 @@ public class Client : IClient
             Console.WriteLine($"[FAILED] {message}");
             Console.ForegroundColor = defaultColor;
         }
+    }
+
+    private bool ParseFunction(string[] scriptLines, ref int index)
+    {
+        var cmd = scriptLines[index].Trim();
+        Match match = Regex.Match(cmd, @"^\s*function\s+(\w+)\s+\{\s*$");
+
+        if (match.Success)
+        {
+            var functionBody = new StringBuilder();
+            int braceCount = 1; // Start with 1 to account for the opening brace
+            while (++index < scriptLines.Length && braceCount > 0)
+            {
+                cmd = scriptLines[index];
+                foreach (char c in cmd)
+                {
+                    if (c == '{') braceCount++;
+                    else if (c == '}') braceCount--;
+                }
+
+                if (braceCount > 0)
+                {
+                    functionBody.AppendLine(cmd);
+                }
+            }
+            _functions.Add(match.Groups[1].Value, functionBody.ToString().Trim().Split('\n'));
+            return true;
+        }
+
+        return false;
     }
 
 

@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using Protocol;
 
 namespace DotNetCli;
@@ -48,7 +49,7 @@ internal class StreamMeasure : StreamHandlerBase
 
     public override bool ProcessDataChunk(DataChunk data)
     {
-        if (Stream == null)
+        if (Stream == null || _framesLeft == 0)
             return false;
 
         var now = DateTime.UtcNow; 
@@ -87,30 +88,28 @@ internal class StreamMeasure : StreamHandlerBase
         _prevTime = now;
         _currentFrameNumber = data.FrameNumber + data.FrameCount;
         _totalDropped += dropped;
-        if (_framesLeft > 0)
+        
+        var converted = ToDoubles(ElementType, data.Payload.Span);
+
+        _framesLeft -= dropped;
+
+        for (int i = 0; i < data.FrameCount && _framesLeft > 0; i++)
         {
-            var converted = ToDoubles(ElementType, data.Payload.Span);
-
-            _framesLeft -= dropped;
-
-            for (int i = 0; i < data.FrameCount && _framesLeft > 0; i++)
+            var frame = converted.AsSpan(i * ElementCount, ElementCount);
+            _statisticsTotal.PushRange(frame.ToArray());
+            if (_statistics != null)
             {
-                var frame = converted.AsSpan(i * ElementCount, ElementCount);
-                _statisticsTotal.PushRange(frame.ToArray());
-                if (_statistics != null)
+                for (int j = 0; j < ElementCount; j++)
                 {
-                    for (int j = 0; j < ElementCount; j++)
-                    {
-                        _statistics[j].Push(frame[j]);
-                    }
+                    _statistics[j].Push(frame[j]);
                 }
-
-                _framesLeft--;
             }
 
-            return true;
+            _framesLeft--;
         }
-        else
+        
+
+        if(_framesLeft == 0)
         {
             JsonElement jsonElement = FormatJson();
 
@@ -132,6 +131,8 @@ internal class StreamMeasure : StreamHandlerBase
 
             return false;
         }
+
+        return true;
     }
 
     private void WriteLine(string header, object? value = null)
@@ -165,14 +166,11 @@ internal class StreamMeasure : StreamHandlerBase
 
         if (_statistics != null)
         {
+            var labels = GetNames(Stream);
             for (var i = 0; i < _statistics.Count; i++)
             {
                 var stats = _statistics[i];
-                string name;
-                if (Stream?.Shape.Count == 1 && Stream.Shape[0].Labels.Count == _statistics.Count)
-                    name = Stream.Shape[0].Labels[i];
-                else
-                    name = $"Component {i}";
+                string name = labels?.Length == _statistics.Count ? labels[i] : $"Component {i}";
 
                 WriteLine($"{name} Minimum", stats.Minimum);
                 WriteLine($"{name} Maximum", stats.Maximum);
@@ -180,6 +178,7 @@ internal class StreamMeasure : StreamHandlerBase
                 WriteLine($"{name} Variance", stats.Variance);
                 WriteLine($"{name} Kurtosis", stats.Kurtosis);
                 WriteLine($"{name} Standard Deviation", stats.StandardDeviation);
+                WriteLine($"{name} Sum", stats.Sum);
             }
         }
         else
@@ -190,6 +189,7 @@ internal class StreamMeasure : StreamHandlerBase
             WriteLine("Element Variance", _statisticsTotal.Variance);
             WriteLine("Element Kurtosis", _statisticsTotal.Kurtosis);
             WriteLine("Element Standard Deviation", _statisticsTotal.StandardDeviation);
+            WriteLine("Element Sum", _statisticsTotal.Sum);
         }
     }
 
@@ -219,14 +219,12 @@ internal class StreamMeasure : StreamHandlerBase
         if (_statistics != null)
         {
             var statsList = new List<Dictionary<string, object>>();
+
+            var labels = GetNames(Stream);
             for (var i = 0; i < _statistics.Count; i++)
             {
                 var stats = _statistics[i];
-                string name;
-                if (Stream?.Shape.Count == 1 && Stream.Shape[0].Labels.Count == _statistics.Count)
-                    name = Stream.Shape[0].Labels[i];
-                else
-                    name = $"Component {i}";
+                string name = labels?.Length == _statistics.Count ? labels[i] : $"Component {i}";
 
                 var componentStats = new Dictionary<string, object>
                 {
@@ -236,7 +234,8 @@ internal class StreamMeasure : StreamHandlerBase
                     {"Mean", stats.Mean},
                     {"Variance", stats.Variance},
                     {"Kurtosis", stats.Kurtosis},
-                    {"StandardDeviation", stats.StandardDeviation}
+                    {"StandardDeviation", stats.StandardDeviation},
+                    {"Sum", stats.Sum}
                 };
                 statsList.Add(componentStats);
             }
@@ -251,13 +250,28 @@ internal class StreamMeasure : StreamHandlerBase
                 {"Mean", _statisticsTotal.Mean},
                 {"Variance", _statisticsTotal.Variance},
                 {"Kurtosis", _statisticsTotal.Kurtosis},
-                {"StandardDeviation", _statisticsTotal.StandardDeviation}
+                {"StandardDeviation", _statisticsTotal.StandardDeviation},
+                {"Sum", _statisticsTotal.Sum}
             };
             jsonObject.Add("TotalStatistics", totalStats);
         }
 
-        string jsonString = JsonSerializer.Serialize(jsonObject);
+        var options = new JsonSerializerOptions
+        {
+            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
+        };
+        string jsonString = JsonSerializer.Serialize(jsonObject, options);
         JsonDocument jsonDocument = JsonDocument.Parse(jsonString);
         return jsonDocument.RootElement;
+    }
+
+    public static string[]? GetNames(StreamConfig? stream)
+    {
+        if (stream?.Shape == null || stream.Shape.Count == 0) 
+            return null;
+
+        return stream.Shape.Aggregate(
+            (IEnumerable<string>)new[] { "" }, 
+            (acc, shape) => acc.SelectMany(prefix => shape.Labels, (prefix, label) => $"{prefix}/{label}".Trim('/'))).ToArray();
     }
 }

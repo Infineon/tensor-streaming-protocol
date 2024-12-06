@@ -23,6 +23,8 @@ public class RunningStatistics : IEquatable<RunningStatistics>
 
     public double _m4;
 
+    public double _sum;
+
     /// <summary>
     /// Gets the total number of samples.
     /// </summary>
@@ -125,7 +127,10 @@ public class RunningStatistics : IEquatable<RunningStatistics>
     [Description("The population excess kurtosis from the full population.\nDoes not use a normalizer and would thus be biased if applied to a subset (type 1).")]
     public double PopulationKurtosis => _n < 3 ? double.NaN : _n * _m4 / (_m2 * _m2) - 3.0;
 
-
+    [DisplayName("Sum")]
+    [Description("Sum of all values")]
+    public double Sum => _sum;
+        
     public RunningStatistics()
     {
     }
@@ -135,7 +140,7 @@ public class RunningStatistics : IEquatable<RunningStatistics>
         PushRange(values);
     }
 
-    public RunningStatistics(long n, double min, double max, double m1, double m2, double m3, double m4)
+    public RunningStatistics(long n, double min, double max, double m1, double m2, double m3, double m4, double sum)
     {
         _n = n;
         _min = min;
@@ -144,6 +149,7 @@ public class RunningStatistics : IEquatable<RunningStatistics>
         _m2 = m2;
         _m3 = m3;
         _m4 = m4;
+        _sum = sum;
     }
 
     public void Reset()
@@ -155,6 +161,7 @@ public class RunningStatistics : IEquatable<RunningStatistics>
         _m2 = 0;
         _m3 = 0;
         _m4 = 0;
+        _sum = 0;
     }
 
     /// <summary>
@@ -172,6 +179,8 @@ public class RunningStatistics : IEquatable<RunningStatistics>
         _m4 += t * s2 * (_n * _n - 3 * _n + 3) + 6 * s2 * _m2 - 4 * s * _m3;
         _m3 += t * s * (_n - 2) - 3 * s * _m2;
         _m2 += t;
+
+        _sum += value;
 
         if (value < _min || double.IsNaN(value))
         {
@@ -217,6 +226,7 @@ public class RunningStatistics : IEquatable<RunningStatistics>
         _m2 = result._m2;
         _m3 = result._m3;
         _m4 = result._m4;
+        _sum = result._sum;
     }
 
     /// <summary>
@@ -249,7 +259,9 @@ public class RunningStatistics : IEquatable<RunningStatistics>
         double min = Math.Min(a._min, b._min);
         double max = Math.Max(a._max, b._max);
 
-        return new RunningStatistics { _n = n, _m1 = m1, _m2 = m2, _m3 = m3, _m4 = m4, _min = min, _max = max };
+        double sum = a._sum + b._sum;
+
+        return new RunningStatistics { _n = n, _m1 = m1, _m2 = m2, _m3 = m3, _m4 = m4, _min = min, _max = max, _sum = sum};
     }
 
     public static RunningStatistics operator +(RunningStatistics a, RunningStatistics b)
@@ -297,7 +309,7 @@ public class RunningStatistics : IEquatable<RunningStatistics>
     /// <returns>A hash code for the current object.</returns>
     public override int GetHashCode()
     {
-        return HashCode.Combine(_n, _min, _max, _m1, _m2, _m3, _m4);
+        return HashCode.Combine(_n, _min, _max, _m1, _m2, _m3, _m4, _sum);
     }
 
     /// <summary>Returns a string that represents the current object.</summary>
