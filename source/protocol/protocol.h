@@ -46,8 +46,8 @@ extern "C" {
 #define PROTOCOL_VERSION \
 (protocol_Version) {     \
     major: 2,            \
-    minor: 1,            \
-    build: 20241201,     \
+    minor: 2,            \
+    build: 20241213,     \
     revision: 0          \
 }
 
@@ -85,8 +85,8 @@ typedef struct protocol_s protocol_t;
 
 // Function pointer typedefs for device manager callbacks (see device_manager_t)
 typedef bool (*protocol_configure_streams_fn)(protocol_t* protocol, int device, void* arg);
-typedef void (*protocol_device_start_fn)(protocol_t* protocol, int device, void* arg);
-typedef void (*protocol_device_stop_fn)(protocol_t* protocol, int device, void* arg);
+typedef void (*protocol_device_start_fn)(protocol_t* protocol, int device, pb_ostream_t* ostream, void* arg);
+typedef void (*protocol_device_stop_fn)(protocol_t* protocol, int device, pb_ostream_t* ostream, void* arg);
 typedef void (*protocol_device_poll_fn)(protocol_t* protocol, int device, pb_ostream_t* ostream, void* arg);
 typedef bool (*protocol_data_received)(protocol_t* protocol, protocol_DataChunk *msg, pb_istream_t* istream, void* arg);
     
@@ -449,6 +449,50 @@ int protocol_set_option_oneof(protocol_t* protocol, int device_id, int option_id
 int protocol_get_option_oneof(protocol_t* protocol, int device_id, int option_id, int* index);
 
 /**
+ * Register a new blob option to a device.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param name: The name of the option.
+ * @param description: The description of the option.
+ * @param default_value: The default value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_add_option_blob(
+    protocol_t* protocol,
+    int device_id,
+    int option_id,
+    const char* name,
+    const char* description,
+    pb_bytes_array_t* default_value);
+
+/**
+ * Update an existing blob option value.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param value: The new value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_set_option_blob(protocol_t* protocol, int device_id, int option_id, pb_bytes_array_t* value);
+
+/**
+ * Read a blob option value.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param value: The current value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_get_option_blob(protocol_t* protocol, int device_id, int option_id, pb_bytes_array_t** value);
+
+/**
  * Clear any registered streams for a given device.
  *
  * @param protocol: The protocol_t object.
@@ -479,7 +523,7 @@ int protocol_add_stream(
     const char* name, 
     protocol_StreamDirection direction, 
     protocol_DataType datatype, 
-    int frequency,              
+    float frequency,              
     int32_t max_frame_count,            
     const char* unit);         
 

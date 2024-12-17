@@ -61,6 +61,9 @@ public class Client : IClient
     // Useful when used in scripts. 
     public bool Interactive { get; private set; }
 
+    // If a multi stream transaction have started with the `mst` command.
+    public bool MultiStreamTransaction { get; private set; }
+
     public int RunTestFile(string testFile)
     {
         Interactive = false;
@@ -229,6 +232,7 @@ public class Client : IClient
         WriteLine(" set int <option> <value>               Set an integer option on the selected device.");
         WriteLine(" set float <option> <value>             Set a decimal (floating-point) option on the selected device.");
         WriteLine(" set index <option> <value>             Set an index option on the selected device.");
+        WriteLine(" set blob <option> <file.bin>           Set an binary option on the selected device.");
         WriteLine(" update                                 Send the updated options to the selected device.");
         WriteLine(" clear                                  Clear any queued updates waiting to be sent to the device.");
         WriteLine(" stop                                   Stop all data streams on the selected device.");
@@ -246,6 +250,8 @@ public class Client : IClient
         WriteLine(" display <stream> <frames>?             Display the stream output to the screen. Defaults to 1 frame if not specified.");
         WriteLine(" stats <stream> <frames>?               Fetch and print statistics for the given number of frames.");
         WriteLine(" random <stream> <frames>?              Send random data to the active device for the specified number of frames.");
+        WriteLine(" mst [begin|end]                        Begin or end an multi stream transaction.");
+
         WriteLine("");
         WriteLine("Use the up and down arrow keys to browse the command history.");
         WriteLine("");
@@ -384,6 +390,44 @@ public class Client : IClient
         }
 
         Config.Options.Add(new OptionValue { OptionId = optionId, OneofValue = indexValue });
+        if (Interactive)
+            WriteLine($"{Config.Options.Count} update(s) pending with 'update' command.");
+    }
+
+    private void SetBlobCommand(string optionStr, string blobFilePath)
+    {
+        if (!int.TryParse(optionStr, out int optionId))
+        {
+            ErrorMessage($"Unable to parse <option> integer argument {optionStr}.");
+            return;
+        }
+
+        if (!File.Exists(blobFilePath))
+        {
+            ErrorMessage($"Unable to find file {blobFilePath}.");
+            return;
+        }
+
+        var bytes = File.ReadAllBytes(blobFilePath);
+
+        if (bytes.Length > 1024 * 2)
+        {
+            ErrorMessage($"File to large. Max is 2 Kb.");
+            return;
+        }
+
+        foreach (var option in Config.Options)
+        {
+            if (option.OptionId == optionId)
+            {
+                option.BlobValue = ByteString.CopyFrom(bytes);
+                if (Interactive)
+                    WriteLine($"Updated previous value. Still {Config.Options.Count} pending.");
+                return;
+            }
+        }
+
+        Config.Options.Add(new OptionValue { OptionId = optionId, BlobValue = ByteString.CopyFrom(bytes) });
         if (Interactive)
             WriteLine($"{Config.Options.Count} update(s) pending with 'update' command.");
     }
@@ -539,6 +583,38 @@ public class Client : IClient
         }
     }
 
+    private void MstBeginCommand()
+    {
+        if (MultiStreamTransaction)
+        {
+            ErrorMessage($"Multi stream transaction already started");
+            return;
+        }
+
+        MultiStreamTransaction = true;
+
+        if (Interactive)
+            WriteLine($"Multi stream transaction stated");
+    }
+
+    private void MstEndCommand()
+    {
+        if (!MultiStreamTransaction)
+        {
+            ErrorMessage($"Multi stream transaction not started");
+            return;
+        }
+
+        SendRequest(new Request { Start = new StartRequest { Device = Config.Device } });
+
+        MultiStreamTransaction = false;
+
+        Flush();
+
+        if (Interactive)
+            WriteLine($"Multi stream transaction ended");
+    }
+
     #endregion
 
     #region Public Methods (IClient)
@@ -582,6 +658,9 @@ public class Client : IClient
 
     public void Flush()
     {
+        if(MultiStreamTransaction)
+            return;
+
         while (_lastTimestamp == default || _streamHandler.Count > 0)
         {
             Thread.Sleep(10);
@@ -660,6 +739,9 @@ public class Client : IClient
             case ["set", "index" or "x", var option, var value]:
                 SetIndexCommand(option, value);
                 break;
+            case ["set", "blob", var option, var file]:
+                SetBlobCommand(option, file);
+                break;
             case ["update"]:
                 UpdateCommand();
                 break;
@@ -730,6 +812,18 @@ public class Client : IClient
 
             case ["call", var functionName]:
                 CallCommand(functionName);
+                break;
+
+            case ["mst", "begin"]:
+                MstBeginCommand();
+                break;
+
+            case ["mst", "end"]:
+                MstEndCommand();
+                break;
+
+            case ["send", var stream, var file]:
+                CommandsEx.SendFileCommand(this, stream, file);
                 break;
 
             default:
@@ -912,6 +1006,22 @@ public class Client : IClient
 
                         continue;
                     }
+                    case Response.ResponseTypeOneofCase.DataInquire:
+                    {
+                        StreamKey key = new StreamKey(response.DataInquire.Device, response.DataInquire.Stream);
+                        if (_streamHandler.TryGetValue(key, out var handler))
+                        {
+                            if (!handler.ProcessDataInquire(response.DataInquire))
+                            {
+                                _lastTimestamp = DateTime.UtcNow;
+                                _streamHandler.Remove(key);
+                                SendRequest(new Request { Stop = new StopRequest { Device = key.DeviceId } });
+                            }
+                        }
+
+                        continue;
+                    }
+
                     default:
                         throw new ArgumentOutOfRangeException();
                 }

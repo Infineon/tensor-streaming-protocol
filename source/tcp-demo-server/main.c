@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,7 +13,7 @@ typedef int socklen_t; /* Define socklen_t for Windows */
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <poll.h>
+#include <fcntl.h>
 #include <errno.h>
 #endif
 #include <pb_decode.h>
@@ -27,42 +26,80 @@ typedef int socklen_t; /* Define socklen_t for Windows */
 
 #define TCP_PORT 12345
 
-// Custom read function for pb_istream_t
-static bool socket_read(pb_istream_t* stream, pb_byte_t* buf, size_t count) 
-{
-    if (count == 0)
-        return true;
+// Buffer size for reading data from the socket
+#define BUFFER_SIZE 4096
 
-    int sockfd = *(int*)(stream->state);
+// Structure to hold application state including protocol context, output stream, socket descriptor, and buffer
+typedef struct {
+    protocol_t* protocol;        // Protocol context for handling protocol-specific operations
+    pb_ostream_t* ostream;       // Output stream for writing data to the socket
+    int sockfd;                  // Socket file descriptor for the client connection
+    uint8_t buffer[BUFFER_SIZE]; // Buffer for reading data from the socket
+    size_t buffer_len;           // Length of data currently in the buffer
+    size_t buffer_pos;           // Current position in the buffer
+} app_state_t;
+
+// Custom read function for pb_istream_t to read data from the socket, with buffering
+static bool socket_read(pb_istream_t* stream, pb_byte_t* buf, size_t count) {
+    if (count == 0) {
+        return true;
+    }
+
+    app_state_t* state = (app_state_t*)(stream->state);
     size_t total_received = 0;
 
     while (total_received < count) {
-        ssize_t received = recv(sockfd, (char*)buf + total_received, (int)(count - total_received), 0);
-
-        if (received < 0) {
+        // If buffer is empty, refill it by reading from the socket
+        if (state->buffer_pos == state->buffer_len) {
+            ssize_t received = recv(state->sockfd, (char*)state->buffer, BUFFER_SIZE, 0);
+            if (received < 0) {
 #ifdef _WIN32
-            PB_SET_ERROR(stream, strerror(WSAGetLastError()));
+                int last_error = WSAGetLastError();
+                if (last_error == WSAEWOULDBLOCK) {
+                    // Non-blocking mode, wait for more data and call device poll repeatedly meanwhile
+                    protocol_call_device_poll(state->protocol, state->ostream);
+                    continue;
+                }
+                else {
+                    PB_SET_ERROR(stream, strerror(last_error));
+                    return false;
+                }
 #else
-            PB_SET_ERROR(stream, strerror(errno));
+                if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                    // Non-blocking mode, wait for more data and call device poll repeatedly meanwhile
+                    protocol_call_device_poll(state->protocol, state->ostream);
+                    continue;
+                }
+                else {
+                    PB_SET_ERROR(stream, strerror(errno));
+                    return false; // Close the connection
+                }
 #endif
-            return false;
-        }
-        else if (received == 0) {
-            PB_SET_ERROR(stream, "socket_read: Socket closed");
-            return false;
+            }
+            else if (received == 0) {
+                PB_SET_ERROR(stream, "socket_read: Socket closed");
+                return false; // Close the connection
+            }
+            state->buffer_len = received;
+            state->buffer_pos = 0;
         }
 
-        total_received += received;
+        // Copy data from the buffer to the destination buffer (buf)
+        size_t available = state->buffer_len - state->buffer_pos; // Available data in buffer
+        size_t to_copy = count - total_received < available ? count - total_received : available;
+        memcpy(buf + total_received, state->buffer + state->buffer_pos, to_copy);
+        state->buffer_pos += to_copy;
+        total_received += to_copy;
     }
 
+    // All requested data has been read. Keep going.
     return true;
 }
 
-// Custom write function for pb_ostream_t
-static bool socket_write(pb_ostream_t* stream, const pb_byte_t* buf, size_t count) 
-{
-    int sockfd = *(int*)(stream->state);
-    ssize_t sent = send(sockfd, (const char*)buf, (int)count, 0);
+// Custom write function for pb_ostream_t to write data to the socket
+static bool socket_write(pb_ostream_t* stream, const pb_byte_t* buf, size_t count) {
+    app_state_t* state = (app_state_t*)(stream->state);
+    ssize_t sent = send(state->sockfd, (const char*)buf, (int)count, 0);
 
     if (sent < 0) {
 #ifdef _WIN32
@@ -73,52 +110,37 @@ static bool socket_write(pb_ostream_t* stream, const pb_byte_t* buf, size_t coun
         return false;
     }
 
-    // TODO: write bigger chunks 
-    // printf("socket_write %zu\n", sent);
-
+    // Return true if all data was sent, otherwise false will close the connection.
     return sent == (ssize_t)count;
 }
 
-static void watchdog_reset()
-{
-    // printf("Watchdog reset!\n");
-}
-
 // Function to handle each client connection
-static void handle_client(protocol_t* protocol, int client_socket)
-{
-    struct pollfd ufds[1];
-    ufds[0].fd = client_socket;
-    ufds[0].events = POLLIN;
+static void handle_client(protocol_t* protocol, int client_socket) {
+    // Initialize the application state
+    app_state_t state = {
+        .protocol = protocol,
+        .sockfd = client_socket,
+        .buffer_len = 0,
+        .buffer_pos = 0,
+    };
 
-    pb_istream_t istream = { &socket_read, &client_socket, SIZE_MAX, 0 };
-    pb_ostream_t ostream = { &socket_write, &client_socket, SIZE_MAX, 0, NULL };
- 
-    while (true)
-    {
-        switch (poll(ufds, 1, 1)) {
-        case -1:
-            perror("poll");
-            break;
-        case 0: // timeout
-            protocol_call_device_poll(protocol, &ostream);
-            continue;
-        default:
-            break;
-        }
+    // Initialize the input and output streams with the custom read/write functions
+    pb_istream_t istream = { &socket_read, &state, SIZE_MAX, 0 };
+    pb_ostream_t ostream = { &socket_write, &state, SIZE_MAX, 0, NULL };
+    state.ostream = &ostream;
 
+    while (true) {
+        // Process the protocol request
         int status = protocol_process_request(protocol, &istream, &ostream);
+
         if (status != PROTOCOL_STATUS_SUCCESS) {
-            printf("Failed to process package. %s %s\n", 
+            printf("Failed to process package. %s %s\n",
                 protocol_get_error_msg(status),
-                istream.errmsg != NULL ? istream.errmsg : istream.errmsg);
+                istream.errmsg != NULL ? istream.errmsg : "");
             break;
         }
 
-        if(ostream.bytes_written != 0)
-            printf("Sent %ld bytes\n", ostream.bytes_written);
-
-        // Reset write/read counter
+        // Reset the write/read counter
         ostream.bytes_written = 0;
     }
 
@@ -127,112 +149,169 @@ static void handle_client(protocol_t* protocol, int client_socket)
         protocol_DeviceStatus status = protocol->board.devices[i].status;
         if (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT) {
             device_manager_t* device_manager = &protocol->device_managers[i];
-            device_manager->stop(protocol, i, device_manager->arg);
+            device_manager->stop(protocol, i, &ostream, device_manager->arg);
         }
     }
-    
+
     printf("Closing socket\n");
     close(client_socket);
 }
 
-// Function to start the TCP server
-static void start_server(protocol_t* protocol, int port)
-{
-    int server_socket, client_socket;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t client_addr_len = sizeof(client_addr);
+// Helper function to setup and configure the server socket
+static int setup_server_socket(int port) {
+    int server_socket;
+    struct sockaddr_in server_addr;
 
+    // Create the server socket
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket < 0) {
         perror("socket");
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
+    // Enable the SO_REUSEADDR option on the server socket
+    int optval = 1;
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&optval, sizeof(optval)) < 0) {
+        perror("setsockopt");
+        close(server_socket);
+        return -1;
+    }
+
+#ifdef _WIN32
+    u_long mode = 1;
+    if (ioctlsocket(server_socket, FIONBIO, &mode) != 0) {
+        perror("ioctlsocket");
+        close(server_socket);
+        return -1;
+    }
+#else
+    int flags = fcntl(server_socket, F_GETFL, 0);
+    if (fcntl(server_socket, F_SETFL, flags | O_NONBLOCK) < 0) {
+        perror("fcntl");
+        close(server_socket);
+        return -1;
+    }
+#endif
+
+    // Configure the server address
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(port);
 
+    // Bind the server socket to the specified port
     if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("bind");
         close(server_socket);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
+    // Listen for incoming connections
     if (listen(server_socket, 5) < 0) {
         perror("listen");
         close(server_socket);
+        return -1;
+    }
+
+    return server_socket;
+}
+
+// Function to start the TCP server
+static void start_server(protocol_t* protocol, int port) {
+    int server_socket = setup_server_socket(port);
+    if (server_socket < 0) {
         exit(EXIT_FAILURE);
     }
 
     printf("Server listening on port %d\n", port);
-  
+
     while (1) {
-        client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_addr_len);
+        // Accept a new client connection
+        struct sockaddr_in client_addr;
+        socklen_t client_addr_len = sizeof(client_addr);
+        int client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_addr_len);
+
         if (client_socket < 0) {
-            perror("accept");
+#ifdef _WIN32
+            int last_error = WSAGetLastError();
+            if (last_error != WSAEWOULDBLOCK) {
+                perror("accept");
+            }
+#else
+            if (errno != EWOULDBLOCK && errno != EAGAIN) {
+                perror("accept");
+            }
+#endif
             continue;
         }
 
         printf("Client connected\n");
+
+        // Set the client socket to non-blocking mode
+#ifdef _WIN32
+        u_long mode = 1;
+        if (ioctlsocket(client_socket, FIONBIO, &mode) != 0) {
+            perror("ioctlsocket");
+            close(client_socket);
+            continue;
+        }
+#else
+        int client_flags = fcntl(client_socket, F_GETFL, 0);
+        if (fcntl(client_socket, F_SETFL, client_flags | O_NONBLOCK) < 0) {
+            perror("fcntl");
+            close(client_socket);
+            continue;
+        }
+#endif
+
+        // Handle the client connection
         handle_client(protocol, client_socket);
     }
 
+    // Clean up the protocol instance
     protocol_delete(protocol);
 
+    // Close the server socket
     close(server_socket);
-}
+ }
 
-int main() 
-{
+int main() {
 #ifdef _WIN32
+    // Initialize Winsock
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         fprintf(stderr, "WSAStartup failed.\n");
-        return -1;
+        return -1; // Exit if Winsock initialization fails
     }
 #endif
 
-    printf("Request                    : %ld\n", sizeof(protocol_Request));
-    printf("BoardCapabilitiesRequest   : %ld\n", sizeof(protocol_BoardCapabilitiesRequest));
-    printf("DeviceConfigurationRequest : %ld\n", sizeof(protocol_DeviceConfigurationRequest));
-    printf("StartRequest               : %ld\n", sizeof(protocol_StartRequest));
-    printf("StopRequest                : %ld\n", sizeof(protocol_StopRequest));
-    printf("WatchdogResetRequest       : %ld\n", sizeof(protocol_WatchdogResetRequest));
-    printf("Response                   : %ld\n", sizeof(protocol_Response));
-    printf("BoardCapabilitiesResponse  : %ld\n", sizeof(protocol_BoardCapabilitiesResponse));
-    printf("DeviceConfigurationResponse: %ld\n", sizeof(protocol_DeviceConfigurationResponse));
-    printf("ErrorResponse              : %ld\n", sizeof(protocol_ErrorResponse));
-    printf("DataChunk                  : %ld\n", sizeof(protocol_DataChunk));
-    printf("Board                      : %ld\n", sizeof(protocol_Board));
-    printf("Device                     : %ld\n", sizeof(protocol_Device));
-    printf("Option                     : %ld\n", sizeof(protocol_Option));
-    printf("Dimension                  : %ld\n", sizeof(protocol_Dimension));
-    printf("StreamConfig               : %ld\n", sizeof(protocol_StreamConfig));
-    
+    // Initialize the protocol version and serial number
     protocol_Version firmware_version = {
-        major: 1,
-        minor : 2,
-        build : 345,
-        revision : 0
+        .major = 1,
+        .minor = 2,
+        .build = 345,
+        .revision = 0
     };
 
-    // {290DE5CB-460B-41BF-B257-022F2FD7849F}
+    // Serial number {290DE5CB-460B-41BF-B257-022F2FD7849F}
     static uint8_t serial[16] = { 0x29, 0x0d, 0xe5, 0xcb, 0x46, 0x0b, 0x41, 0xbf, 0xb2, 0x57, 0x02, 0x2f, 0x2f, 0xd7, 0x84, 0x9f };
 
+    // Create the protocol instance
     protocol_t* protocol = protocol_create("Demo Board", serial, firmware_version);
 
-    protocol_configure_watchdog(protocol, 1000, watchdog_reset);
-
+    // Register devices with the protocol
     camera_register(protocol);
     mic_register(protocol);
     model_register(protocol);
 
+    // Start the TCP server on the specified port
     start_server(protocol, TCP_PORT);
-    
+
+    // Clean up the protocol instance
     protocol_delete(protocol);
 
 #ifdef _WIN32
+    // Clean up Winsock
     WSACleanup();
 #endif
 

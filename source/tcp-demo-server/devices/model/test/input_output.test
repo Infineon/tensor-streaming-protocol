@@ -1,0 +1,10 @@
+open tcp localhost 12345
+
+select 2
+
+mst begin
+send 0 "input.wav"
+display 1 279
+// verify 1 "output.csv"
+mst end
+

@@ -30,19 +30,50 @@ internal static class CommandsEx
         }
 
         client.CheckConnected();
-        
+
         // The Tag=-1 will prevent the response to be w
         client.SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = client.Config.Device, Tag = -1} });
 
         if (!client.Interactive)
             client.Flush();
 
-        client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
-
         client.AddStreamHandler(client.Config.Device, streamId, new StreamMeasure(client, frameCount));
 
-        if (!client.Interactive)
-            client.Flush();
+        if (!client.MultiStreamTransaction)
+        {
+            client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
+
+            if (!client.Interactive)
+                client.Flush();
+        }
+    }
+
+    public static void SendFileCommand(IClient client, string streamStr, string filePath)
+    {
+        if (!int.TryParse(streamStr, out int streamId))
+        {
+            client.ErrorMessage($"Unable to parse <stream> integer argument {streamStr}.");
+            return;
+        }
+
+        filePath = Path.GetFullPath(filePath);
+
+        if (!File.Exists(filePath))
+        {
+            client.ErrorMessage($"File not found. {filePath}");
+            return;
+        }
+
+        client.CheckConnected();
+
+        client.AddStreamHandler(client.Config.Device, streamId, new UploadFile(client, filePath));
+
+        client.SendRequest(new Request { Capabilities = new BoardCapabilitiesRequest { Device = client.Config.Device, Tag = -1 } });
+
+        client.Flush();
+
+        client.WriteLine($"Sending file {filePath}");
+
     }
 
     public static void SaveCsv(IClient client, string streamStr, string? fileName, string framesStr)
@@ -72,12 +103,15 @@ internal static class CommandsEx
         // Need to wait for the response here
         client.Flush();
 
-        client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
-
         client.AddStreamHandler(client.Config.Device, streamId, new CsvWriter(client, frameCount, fileName));
 
-        if (!client.Interactive)
-            client.Flush();
+        if (!client.MultiStreamTransaction)
+        {
+            client.SendRequest(new Request { Start = new StartRequest { Device = client.Config.Device } });
+
+            if (!client.Interactive)
+                client.Flush();
+        }
     }
 
     public static void SendRandomDataCommand(IClient client, string deviceStr, string streamStr, string sizeStr, string framesStr)

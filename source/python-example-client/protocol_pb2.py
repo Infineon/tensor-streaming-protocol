@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 import model_pb2 as model__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprotocol.proto\x12\x08protocol\x1a\x0bmodel.proto\"\xbc\x02\n\x07Request\x12:\n\x0c\x63\x61pabilities\x18\x01 \x01(\x0b\x32\".protocol.BoardCapabilitiesRequestH\x00\x12\x36\n\x06\x63onfig\x18\x02 \x01(\x0b\x32$.protocol.DeviceConfigurationRequestH\x00\x12\'\n\x05start\x18\x03 \x01(\x0b\x32\x16.protocol.StartRequestH\x00\x12%\n\x04stop\x18\x04 \x01(\x0b\x32\x15.protocol.StopRequestH\x00\x12\x38\n\x0ewatchdog_reset\x18\x05 \x01(\x0b\x32\x1e.protocol.WatchdogResetRequestH\x00\x12#\n\x04\x64\x61ta\x18\x06 \x01(\x0b\x32\x13.protocol.DataChunkH\x00\x42\x0e\n\x0crequest_type\"\x8f\x02\n\x08Response\x12;\n\x0c\x63\x61pabilities\x18\x01 \x01(\x0b\x32#.protocol.BoardCapabilitiesResponseH\x00\x12\x37\n\x06\x63onfig\x18\x02 \x01(\x0b\x32%.protocol.DeviceConfigurationResponseH\x00\x12(\n\x05\x65rror\x18\x03 \x01(\x0b\x32\x17.protocol.ErrorResponseH\x00\x12#\n\x04\x64\x61ta\x18\x04 \x01(\x0b\x32\x13.protocol.DataChunkH\x00\x12-\n\x0c\x64\x61ta_inquire\x18\x05 \x01(\x0b\x32\x15.protocol.DataInquireH\x00\x42\x0f\n\rresponse_type\"*\n\x18\x42oardCapabilitiesRequest\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x11\";\n\x19\x42oardCapabilitiesResponse\x12\x1e\n\x05\x62oard\x18\x01 \x01(\x0b\x32\x0f.protocol.Board\"\x82\x01\n\x0bOptionValue\x12\x11\n\toption_id\x18\x01 \x01(\x05\x12\x13\n\tint_value\x18\x02 \x01(\x05H\x00\x12\x15\n\x0b\x66loat_value\x18\x03 \x01(\x02H\x00\x12\x14\n\nbool_value\x18\x04 \x01(\x08H\x00\x12\x15\n\x0boneof_value\x18\x05 \x01(\x05H\x00\x42\x07\n\x05value\"T\n\x1a\x44\x65viceConfigurationRequest\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\x12&\n\x07options\x18\x02 \x03(\x0b\x32\x15.protocol.OptionValue\"\xbe\x01\n\x1b\x44\x65viceConfigurationResponse\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\x12&\n\x07options\x18\x02 \x03(\x0b\x32\x15.protocol.OptionValue\x12\'\n\x07streams\x18\x03 \x03(\x0b\x32\x16.protocol.StreamConfig\x12&\n\x06status\x18\x04 \x01(\x0e\x32\x16.protocol.DeviceStatus\x12\x16\n\x0estatus_message\x18\x05 \x01(\t\"\x1e\n\x0cStartRequest\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\"\x1d\n\x0bStopRequest\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x11\"g\n\tDataChunk\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\x12\x0e\n\x06stream\x18\x02 \x01(\x05\x12\x13\n\x0b\x66rame_count\x18\x03 \x01(\x05\x12\x14\n\x0c\x66rame_number\x18\x04 \x01(\x05\x12\x0f\n\x07payload\x18\x05 \x01(\x0c\"B\n\x0b\x44\x61taInquire\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\x12\x0e\n\x06stream\x18\x02 \x01(\x05\x12\x13\n\x0b\x66rame_count\x18\x03 \x01(\x05\":\n\rErrorResponse\x12\x15\n\rerror_message\x18\x01 \x01(\t\x12\x12\n\nerror_code\x18\x02 \x01(\x05\"\x16\n\x14WatchdogResetRequestb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0eprotocol.proto\x12\x08protocol\x1a\x0bmodel.proto\"\xe5\x02\n\x07Request\x12:\n\x0c\x63\x61pabilities\x18\x01 \x01(\x0b\x32\".protocol.BoardCapabilitiesRequestH\x00\x12\x36\n\x06\x63onfig\x18\x02 \x01(\x0b\x32$.protocol.DeviceConfigurationRequestH\x00\x12\'\n\x05start\x18\x03 \x01(\x0b\x32\x16.protocol.StartRequestH\x00\x12%\n\x04stop\x18\x04 \x01(\x0b\x32\x15.protocol.StopRequestH\x00\x12\x38\n\x0ewatchdog_reset\x18\x05 \x01(\x0b\x32\x1e.protocol.WatchdogResetRequestH\x00\x12#\n\x04\x64\x61ta\x18\x06 \x01(\x0b\x32\x13.protocol.DataChunkH\x00\x12\'\n\x05reset\x18\x07 \x01(\x0b\x32\x16.protocol.ResetRequestH\x00\x42\x0e\n\x0crequest_type\"\x8f\x02\n\x08Response\x12;\n\x0c\x63\x61pabilities\x18\x01 \x01(\x0b\x32#.protocol.BoardCapabilitiesResponseH\x00\x12\x37\n\x06\x63onfig\x18\x02 \x01(\x0b\x32%.protocol.DeviceConfigurationResponseH\x00\x12(\n\x05\x65rror\x18\x03 \x01(\x0b\x32\x17.protocol.ErrorResponseH\x00\x12#\n\x04\x64\x61ta\x18\x04 \x01(\x0b\x32\x13.protocol.DataChunkH\x00\x12-\n\x0c\x64\x61ta_inquire\x18\x05 \x01(\x0b\x32\x15.protocol.DataInquireH\x00\x42\x0f\n\rresponse_type\"7\n\x18\x42oardCapabilitiesRequest\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x11\x12\x0b\n\x03tag\x18\x02 \x01(\x05\"H\n\x19\x42oardCapabilitiesResponse\x12\x1e\n\x05\x62oard\x18\x01 \x01(\x0b\x32\x0f.protocol.Board\x12\x0b\n\x03tag\x18\x02 \x01(\x05\"\x9a\x01\n\x0bOptionValue\x12\x11\n\toption_id\x18\x01 \x01(\x05\x12\x13\n\tint_value\x18\x02 \x01(\x05H\x00\x12\x15\n\x0b\x66loat_value\x18\x03 \x01(\x02H\x00\x12\x14\n\nbool_value\x18\x04 \x01(\x08H\x00\x12\x15\n\x0boneof_value\x18\x05 \x01(\x05H\x00\x12\x16\n\x0c\x62inary_value\x18\x06 \x01(\x0cH\x00\x42\x07\n\x05value\"a\n\x1a\x44\x65viceConfigurationRequest\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\x12&\n\x07options\x18\x02 \x03(\x0b\x32\x15.protocol.OptionValue\x12\x0b\n\x03tag\x18\x03 \x01(\x05\"\xcb\x01\n\x1b\x44\x65viceConfigurationResponse\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\x12&\n\x07options\x18\x02 \x03(\x0b\x32\x15.protocol.OptionValue\x12\'\n\x07streams\x18\x03 \x03(\x0b\x32\x16.protocol.StreamConfig\x12&\n\x06status\x18\x04 \x01(\x0e\x32\x16.protocol.DeviceStatus\x12\x16\n\x0estatus_message\x18\x05 \x01(\t\x12\x0b\n\x03tag\x18\x06 \x01(\x05\"\x1e\n\x0cStartRequest\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\"\x1d\n\x0bStopRequest\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x11\"\x0e\n\x0cResetRequest\"\x90\x01\n\tDataChunk\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\x12\x0e\n\x06stream\x18\x02 \x01(\x05\x12\x13\n\x0b\x66rame_count\x18\x03 \x01(\x05\x12\x14\n\x0c\x66rame_number\x18\x04 \x01(\x05\x12\x0f\n\x07payload\x18\x05 \x01(\x0c\x12\'\n\ntimestamps\x18\x06 \x03(\x0b\x32\x13.protocol.Timestamp\"0\n\tTimestamp\x12\x11\n\ttimestamp\x18\x01 \x01(\x03\x12\x10\n\x08\x64uration\x18\x02 \x01(\x05\"B\n\x0b\x44\x61taInquire\x12\x0e\n\x06\x64\x65vice\x18\x01 \x01(\x05\x12\x0e\n\x06stream\x18\x02 \x01(\x05\x12\x13\n\x0b\x66rame_count\x18\x03 \x01(\x05\":\n\rErrorResponse\x12\x15\n\rerror_message\x18\x01 \x01(\t\x12\x12\n\nerror_code\x18\x02 \x01(\x05\"\x16\n\x14WatchdogResetRequestb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,29 +33,33 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'protocol_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_REQUEST']._serialized_start=42
-  _globals['_REQUEST']._serialized_end=358
-  _globals['_RESPONSE']._serialized_start=361
-  _globals['_RESPONSE']._serialized_end=632
-  _globals['_BOARDCAPABILITIESREQUEST']._serialized_start=634
-  _globals['_BOARDCAPABILITIESREQUEST']._serialized_end=676
-  _globals['_BOARDCAPABILITIESRESPONSE']._serialized_start=678
-  _globals['_BOARDCAPABILITIESRESPONSE']._serialized_end=737
-  _globals['_OPTIONVALUE']._serialized_start=740
-  _globals['_OPTIONVALUE']._serialized_end=870
-  _globals['_DEVICECONFIGURATIONREQUEST']._serialized_start=872
-  _globals['_DEVICECONFIGURATIONREQUEST']._serialized_end=956
-  _globals['_DEVICECONFIGURATIONRESPONSE']._serialized_start=959
-  _globals['_DEVICECONFIGURATIONRESPONSE']._serialized_end=1149
-  _globals['_STARTREQUEST']._serialized_start=1151
-  _globals['_STARTREQUEST']._serialized_end=1181
-  _globals['_STOPREQUEST']._serialized_start=1183
-  _globals['_STOPREQUEST']._serialized_end=1212
-  _globals['_DATACHUNK']._serialized_start=1214
-  _globals['_DATACHUNK']._serialized_end=1317
-  _globals['_DATAINQUIRE']._serialized_start=1319
-  _globals['_DATAINQUIRE']._serialized_end=1385
-  _globals['_ERRORRESPONSE']._serialized_start=1387
-  _globals['_ERRORRESPONSE']._serialized_end=1445
-  _globals['_WATCHDOGRESETREQUEST']._serialized_start=1447
-  _globals['_WATCHDOGRESETREQUEST']._serialized_end=1469
+  _globals['_REQUEST']._serialized_end=399
+  _globals['_RESPONSE']._serialized_start=402
+  _globals['_RESPONSE']._serialized_end=673
+  _globals['_BOARDCAPABILITIESREQUEST']._serialized_start=675
+  _globals['_BOARDCAPABILITIESREQUEST']._serialized_end=730
+  _globals['_BOARDCAPABILITIESRESPONSE']._serialized_start=732
+  _globals['_BOARDCAPABILITIESRESPONSE']._serialized_end=804
+  _globals['_OPTIONVALUE']._serialized_start=807
+  _globals['_OPTIONVALUE']._serialized_end=961
+  _globals['_DEVICECONFIGURATIONREQUEST']._serialized_start=963
+  _globals['_DEVICECONFIGURATIONREQUEST']._serialized_end=1060
+  _globals['_DEVICECONFIGURATIONRESPONSE']._serialized_start=1063
+  _globals['_DEVICECONFIGURATIONRESPONSE']._serialized_end=1266
+  _globals['_STARTREQUEST']._serialized_start=1268
+  _globals['_STARTREQUEST']._serialized_end=1298
+  _globals['_STOPREQUEST']._serialized_start=1300
+  _globals['_STOPREQUEST']._serialized_end=1329
+  _globals['_RESETREQUEST']._serialized_start=1331
+  _globals['_RESETREQUEST']._serialized_end=1345
+  _globals['_DATACHUNK']._serialized_start=1348
+  _globals['_DATACHUNK']._serialized_end=1492
+  _globals['_TIMESTAMP']._serialized_start=1494
+  _globals['_TIMESTAMP']._serialized_end=1542
+  _globals['_DATAINQUIRE']._serialized_start=1544
+  _globals['_DATAINQUIRE']._serialized_end=1610
+  _globals['_ERRORRESPONSE']._serialized_start=1612
+  _globals['_ERRORRESPONSE']._serialized_end=1670
+  _globals['_WATCHDOGRESETREQUEST']._serialized_start=1672
+  _globals['_WATCHDOGRESETREQUEST']._serialized_end=1694
 # @@protoc_insertion_point(module_scope)

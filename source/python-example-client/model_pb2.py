@@ -24,41 +24,43 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0bmodel.proto\x12\x08protocol\"H\n\x07Version\x12\r\n\x05major\x18\x01 \x01(\r\x12\r\n\x05minor\x18\x02 \x01(\r\x12\r\n\x05\x62uild\x18\x03 \x01(\r\x12\x10\n\x08revision\x18\x04 \x01(\r\"\x1c\n\x0c\x44\x65viceSerial\x12\x0c\n\x04uuid\x18\x01 \x01(\x0c\"\xd4\x01\n\x05\x42oard\x12&\n\x06serial\x18\x01 \x01(\x0b\x32\x16.protocol.DeviceSerial\x12\x0c\n\x04name\x18\x02 \x01(\t\x12+\n\x10\x66irmware_version\x18\x03 \x01(\x0b\x32\x11.protocol.Version\x12+\n\x10protocol_version\x18\x04 \x01(\x0b\x32\x11.protocol.Version\x12\x18\n\x10watchdog_timeout\x18\x05 \x01(\x05\x12!\n\x07\x64\x65vices\x18\x06 \x03(\x0b\x32\x10.protocol.Device\"\xee\x01\n\x06\x44\x65vice\x12\x11\n\tdevice_id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\"\n\x04type\x18\x04 \x01(\x0e\x32\x14.protocol.DeviceType\x12!\n\x07options\x18\x05 \x03(\x0b\x32\x10.protocol.Option\x12\'\n\x07streams\x18\x06 \x03(\x0b\x32\x16.protocol.StreamConfig\x12&\n\x06status\x18\x07 \x01(\x0e\x32\x16.protocol.DeviceStatus\x12\x16\n\x0estatus_message\x18\x08 \x01(\t\"\xf5\x01\n\x06Option\x12\x11\n\toption_id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\'\n\x08int_type\x18\x04 \x01(\x0b\x32\x13.protocol.OptionIntH\x00\x12+\n\nfloat_type\x18\x05 \x01(\x0b\x32\x15.protocol.OptionFloatH\x00\x12)\n\tbool_type\x18\x06 \x01(\x0b\x32\x14.protocol.OptionBoolH\x00\x12+\n\noneof_type\x18\x07 \x01(\x0b\x32\x15.protocol.OptionOneOfH\x00\x42\x07\n\x05value\"\xab\x02\n\x0cStreamConfig\x12\x0c\n\x04name\x18\x01 \x01(\t\x12,\n\tdirection\x18\x02 \x01(\x0e\x32\x19.protocol.StreamDirection\x12$\n\x08\x64\x61tatype\x18\x03 \x01(\x0e\x32\x12.protocol.DataType\x12\"\n\x05shape\x18\x04 \x03(\x0b\x32\x13.protocol.Dimension\x12\x11\n\tfrequency\x18\x05 \x01(\x02\x12\x17\n\x0fmax_frame_count\x18\x06 \x01(\x05\x12\x0c\n\x04unit\x18\x07 \x01(\t\x12\x15\n\rcurrent_frame\x18\x08 \x01(\x05\x12\x16\n\x0e\x66rames_dropped\x18\t \x01(\x05\x12\r\n\x05scale\x18\n \x01(\x02\x12\x0e\n\x06offset\x18\x0b \x01(\x12\x12\r\n\x05shift\x18\x0c \x01(\x05\"7\n\tDimension\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x05\x12\x0e\n\x06labels\x18\x03 \x03(\t\"_\n\tOptionInt\x12\x15\n\rcurrent_value\x18\x01 \x01(\x05\x12\x15\n\rdefault_value\x18\x02 \x01(\x05\x12\x11\n\tmin_value\x18\x03 \x01(\x05\x12\x11\n\tmax_value\x18\x04 \x01(\x05\"a\n\x0bOptionFloat\x12\x15\n\rcurrent_value\x18\x01 \x01(\x02\x12\x15\n\rdefault_value\x18\x02 \x01(\x02\x12\x11\n\tmin_value\x18\x03 \x01(\x02\x12\x11\n\tmax_value\x18\x04 \x01(\x02\":\n\nOptionBool\x12\x15\n\rdefault_value\x18\x01 \x01(\x08\x12\x15\n\rcurrent_value\x18\x02 \x01(\x08\"J\n\x0bOptionOneOf\x12\x15\n\rdefault_index\x18\x01 \x01(\x05\x12\x15\n\rcurrent_index\x18\x02 \x01(\x05\x12\r\n\x05items\x18\x03 \x03(\t*\x89\x01\n\nDeviceType\x12\x1b\n\x17\x44\x45VICE_TYPE_UNSPECIFIED\x10\x00\x12\x16\n\x12\x44\x45VICE_TYPE_SENSOR\x10\x01\x12\x18\n\x14\x44\x45VICE_TYPE_PLAYBACK\x10\x02\x12\x15\n\x11\x44\x45VICE_TYPE_MODEL\x10\x03\x12\x15\n\x11\x44\x45VICE_TYPE_OTHER\x10\x04*y\n\x0c\x44\x65viceStatus\x12\x17\n\x13\x44\x45VICE_STATUS_READY\x10\x00\x12\x18\n\x14\x44\x45VICE_STATUS_ACTIVE\x10\x01\x12\x1d\n\x19\x44\x45VICE_STATUS_ACTIVE_WAIT\x10\x02\x12\x17\n\x13\x44\x45VICE_STATUS_ERROR\x10\x03*l\n\x0fStreamDirection\x12 \n\x1cSTREAM_DIRECTION_UNSPECIFIED\x10\x00\x12\x1a\n\x16STREAM_DIRECTION_INPUT\x10\x01\x12\x1b\n\x17STREAM_DIRECTION_OUTPUT\x10\x02*\xa7\x02\n\x08\x44\x61taType\x12\x15\n\x11\x44\x41TA_TYPE_UNKNOWN\x10\x00\x12\x10\n\x0c\x44\x41TA_TYPE_U8\x10\x01\x12\x10\n\x0c\x44\x41TA_TYPE_S8\x10\x02\x12\x11\n\rDATA_TYPE_U16\x10\x03\x12\x11\n\rDATA_TYPE_S16\x10\x04\x12\x11\n\rDATA_TYPE_U32\x10\x05\x12\x11\n\rDATA_TYPE_S32\x10\x06\x12\x11\n\rDATA_TYPE_F32\x10\x07\x12\x11\n\rDATA_TYPE_F64\x10\x08\x12\x10\n\x0c\x44\x41TA_TYPE_Q7\x10\t\x12\x11\n\rDATA_TYPE_Q15\x10\n\x12\x11\n\rDATA_TYPE_Q31\x10\x0b\x12\x10\n\x0c\x44\x41TA_TYPE_D8\x10\x0c\x12\x11\n\rDATA_TYPE_D16\x10\r\x12\x11\n\rDATA_TYPE_D32\x10\x0e\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0bmodel.proto\x12\x08protocol\"H\n\x07Version\x12\r\n\x05major\x18\x01 \x01(\r\x12\r\n\x05minor\x18\x02 \x01(\r\x12\r\n\x05\x62uild\x18\x03 \x01(\r\x12\x10\n\x08revision\x18\x04 \x01(\r\"\x1b\n\x0b\x42oardSerial\x12\x0c\n\x04uuid\x18\x01 \x01(\x0c\"\xd3\x01\n\x05\x42oard\x12%\n\x06serial\x18\x01 \x01(\x0b\x32\x15.protocol.BoardSerial\x12\x0c\n\x04name\x18\x02 \x01(\t\x12+\n\x10\x66irmware_version\x18\x03 \x01(\x0b\x32\x11.protocol.Version\x12+\n\x10protocol_version\x18\x04 \x01(\x0b\x32\x11.protocol.Version\x12\x18\n\x10watchdog_timeout\x18\x05 \x01(\x05\x12!\n\x07\x64\x65vices\x18\x06 \x03(\x0b\x32\x10.protocol.Device\"\xee\x01\n\x06\x44\x65vice\x12\x11\n\tdevice_id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\"\n\x04type\x18\x04 \x01(\x0e\x32\x14.protocol.DeviceType\x12!\n\x07options\x18\x05 \x03(\x0b\x32\x10.protocol.Option\x12\'\n\x07streams\x18\x06 \x03(\x0b\x32\x16.protocol.StreamConfig\x12&\n\x06status\x18\x07 \x01(\x0e\x32\x16.protocol.DeviceStatus\x12\x16\n\x0estatus_message\x18\x08 \x01(\t\"\xa0\x02\n\x06Option\x12\x11\n\toption_id\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\'\n\x08int_type\x18\x04 \x01(\x0b\x32\x13.protocol.OptionIntH\x00\x12+\n\nfloat_type\x18\x05 \x01(\x0b\x32\x15.protocol.OptionFloatH\x00\x12)\n\tbool_type\x18\x06 \x01(\x0b\x32\x14.protocol.OptionBoolH\x00\x12+\n\noneof_type\x18\x07 \x01(\x0b\x32\x15.protocol.OptionOneOfH\x00\x12)\n\tblob_type\x18\x08 \x01(\x0b\x32\x14.protocol.OptionBlobH\x00\x42\x07\n\x05value\"\xab\x02\n\x0cStreamConfig\x12\x0c\n\x04name\x18\x01 \x01(\t\x12,\n\tdirection\x18\x02 \x01(\x0e\x32\x19.protocol.StreamDirection\x12$\n\x08\x64\x61tatype\x18\x03 \x01(\x0e\x32\x12.protocol.DataType\x12\"\n\x05shape\x18\x04 \x03(\x0b\x32\x13.protocol.Dimension\x12\x11\n\tfrequency\x18\x05 \x01(\x02\x12\x17\n\x0fmax_frame_count\x18\x06 \x01(\x05\x12\x0c\n\x04unit\x18\x07 \x01(\t\x12\x15\n\rcurrent_frame\x18\x08 \x01(\x05\x12\x16\n\x0e\x66rames_dropped\x18\t \x01(\x05\x12\r\n\x05scale\x18\n \x01(\x02\x12\x0e\n\x06offset\x18\x0b \x01(\x12\x12\r\n\x05shift\x18\x0c \x01(\x05\"7\n\tDimension\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x05\x12\x0e\n\x06labels\x18\x03 \x03(\t\"_\n\tOptionInt\x12\x15\n\rcurrent_value\x18\x01 \x01(\x05\x12\x15\n\rdefault_value\x18\x02 \x01(\x05\x12\x11\n\tmin_value\x18\x03 \x01(\x05\x12\x11\n\tmax_value\x18\x04 \x01(\x05\"a\n\x0bOptionFloat\x12\x15\n\rcurrent_value\x18\x01 \x01(\x02\x12\x15\n\rdefault_value\x18\x02 \x01(\x02\x12\x11\n\tmin_value\x18\x03 \x01(\x02\x12\x11\n\tmax_value\x18\x04 \x01(\x02\":\n\nOptionBool\x12\x15\n\rdefault_value\x18\x01 \x01(\x08\x12\x15\n\rcurrent_value\x18\x02 \x01(\x08\"J\n\x0bOptionOneOf\x12\x15\n\rdefault_index\x18\x01 \x01(\x05\x12\x15\n\rcurrent_index\x18\x02 \x01(\x05\x12\r\n\x05items\x18\x03 \x03(\t\":\n\nOptionBlob\x12\x15\n\rcurrent_value\x18\x01 \x01(\x0c\x12\x15\n\rdefault_value\x18\x02 \x01(\x0c*\xba\x01\n\nDeviceType\x12\x1b\n\x17\x44\x45VICE_TYPE_UNSPECIFIED\x10\x00\x12\x16\n\x12\x44\x45VICE_TYPE_SENSOR\x10\x01\x12\x18\n\x14\x44\x45VICE_TYPE_PLAYBACK\x10\x02\x12\x15\n\x11\x44\x45VICE_TYPE_MODEL\x10\x03\x12\x15\n\x11\x44\x45VICE_TYPE_OTHER\x10\x04\x12\x18\n\x14\x44\x45VICE_TYPE_LOOPBACK\x10\x05\x12\x15\n\x11\x44\x45VICE_TYPE_BOARD\x10\x06*y\n\x0c\x44\x65viceStatus\x12\x17\n\x13\x44\x45VICE_STATUS_READY\x10\x00\x12\x18\n\x14\x44\x45VICE_STATUS_ACTIVE\x10\x01\x12\x1d\n\x19\x44\x45VICE_STATUS_ACTIVE_WAIT\x10\x02\x12\x17\n\x13\x44\x45VICE_STATUS_ERROR\x10\x03*l\n\x0fStreamDirection\x12 \n\x1cSTREAM_DIRECTION_UNSPECIFIED\x10\x00\x12\x1a\n\x16STREAM_DIRECTION_INPUT\x10\x01\x12\x1b\n\x17STREAM_DIRECTION_OUTPUT\x10\x02*\xa7\x02\n\x08\x44\x61taType\x12\x15\n\x11\x44\x41TA_TYPE_UNKNOWN\x10\x00\x12\x10\n\x0c\x44\x41TA_TYPE_U8\x10\x01\x12\x10\n\x0c\x44\x41TA_TYPE_S8\x10\x02\x12\x11\n\rDATA_TYPE_U16\x10\x03\x12\x11\n\rDATA_TYPE_S16\x10\x04\x12\x11\n\rDATA_TYPE_U32\x10\x05\x12\x11\n\rDATA_TYPE_S32\x10\x06\x12\x11\n\rDATA_TYPE_F32\x10\x07\x12\x11\n\rDATA_TYPE_F64\x10\x08\x12\x10\n\x0c\x44\x41TA_TYPE_Q7\x10\t\x12\x11\n\rDATA_TYPE_Q15\x10\n\x12\x11\n\rDATA_TYPE_Q31\x10\x0b\x12\x10\n\x0c\x44\x41TA_TYPE_D8\x10\x0c\x12\x11\n\rDATA_TYPE_D16\x10\r\x12\x11\n\rDATA_TYPE_D32\x10\x0e\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'model_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_DEVICETYPE']._serialized_start=1525
-  _globals['_DEVICETYPE']._serialized_end=1662
-  _globals['_DEVICESTATUS']._serialized_start=1664
-  _globals['_DEVICESTATUS']._serialized_end=1785
-  _globals['_STREAMDIRECTION']._serialized_start=1787
-  _globals['_STREAMDIRECTION']._serialized_end=1895
-  _globals['_DATATYPE']._serialized_start=1898
-  _globals['_DATATYPE']._serialized_end=2193
+  _globals['_DEVICETYPE']._serialized_start=1626
+  _globals['_DEVICETYPE']._serialized_end=1812
+  _globals['_DEVICESTATUS']._serialized_start=1814
+  _globals['_DEVICESTATUS']._serialized_end=1935
+  _globals['_STREAMDIRECTION']._serialized_start=1937
+  _globals['_STREAMDIRECTION']._serialized_end=2045
+  _globals['_DATATYPE']._serialized_start=2048
+  _globals['_DATATYPE']._serialized_end=2343
   _globals['_VERSION']._serialized_start=25
   _globals['_VERSION']._serialized_end=97
-  _globals['_DEVICESERIAL']._serialized_start=99
-  _globals['_DEVICESERIAL']._serialized_end=127
-  _globals['_BOARD']._serialized_start=130
-  _globals['_BOARD']._serialized_end=342
-  _globals['_DEVICE']._serialized_start=345
-  _globals['_DEVICE']._serialized_end=583
-  _globals['_OPTION']._serialized_start=586
-  _globals['_OPTION']._serialized_end=831
-  _globals['_STREAMCONFIG']._serialized_start=834
-  _globals['_STREAMCONFIG']._serialized_end=1133
-  _globals['_DIMENSION']._serialized_start=1135
-  _globals['_DIMENSION']._serialized_end=1190
-  _globals['_OPTIONINT']._serialized_start=1192
-  _globals['_OPTIONINT']._serialized_end=1287
-  _globals['_OPTIONFLOAT']._serialized_start=1289
-  _globals['_OPTIONFLOAT']._serialized_end=1386
-  _globals['_OPTIONBOOL']._serialized_start=1388
-  _globals['_OPTIONBOOL']._serialized_end=1446
-  _globals['_OPTIONONEOF']._serialized_start=1448
-  _globals['_OPTIONONEOF']._serialized_end=1522
+  _globals['_BOARDSERIAL']._serialized_start=99
+  _globals['_BOARDSERIAL']._serialized_end=126
+  _globals['_BOARD']._serialized_start=129
+  _globals['_BOARD']._serialized_end=340
+  _globals['_DEVICE']._serialized_start=343
+  _globals['_DEVICE']._serialized_end=581
+  _globals['_OPTION']._serialized_start=584
+  _globals['_OPTION']._serialized_end=872
+  _globals['_STREAMCONFIG']._serialized_start=875
+  _globals['_STREAMCONFIG']._serialized_end=1174
+  _globals['_DIMENSION']._serialized_start=1176
+  _globals['_DIMENSION']._serialized_end=1231
+  _globals['_OPTIONINT']._serialized_start=1233
+  _globals['_OPTIONINT']._serialized_end=1328
+  _globals['_OPTIONFLOAT']._serialized_start=1330
+  _globals['_OPTIONFLOAT']._serialized_end=1427
+  _globals['_OPTIONBOOL']._serialized_start=1429
+  _globals['_OPTIONBOOL']._serialized_end=1487
+  _globals['_OPTIONONEOF']._serialized_start=1489
+  _globals['_OPTIONONEOF']._serialized_end=1563
+  _globals['_OPTIONBLOB']._serialized_start=1565
+  _globals['_OPTIONBLOB']._serialized_end=1623
 # @@protoc_insertion_point(module_scope)

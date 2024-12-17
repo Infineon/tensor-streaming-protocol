@@ -20,6 +20,8 @@ public interface IClient
 
     public bool Interactive { get; }
 
+    bool MultiStreamTransaction { get; }
+
     void SendRequest(Request request);
 
     void AddStreamHandler(int device, int stream, IStreamHandler handler);

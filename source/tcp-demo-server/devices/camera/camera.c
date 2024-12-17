@@ -64,10 +64,11 @@ static void camera_poll(
     protocol_send_data_chunk(protocol, device, 0, 1, 0, ostream, camera_write_payload);
 }
 
-static void camera_start(protocol_t* protocol, int device, void* arg)
+static void camera_start(protocol_t* protocol, int device, pb_ostream_t* ostream, void* arg)
 {
     foobar_camera_t* state = (foobar_camera_t*)arg;
     UNUSED(state);
+    UNUSED(ostream);
 
     printf("CAMERA START STREAMING\n");
 
@@ -75,10 +76,11 @@ static void camera_start(protocol_t* protocol, int device, void* arg)
 
 }
 
-static void camera_stop(protocol_t* protocol, int device, void* arg)
+static void camera_stop(protocol_t* protocol, int device, pb_ostream_t* ostream, void* arg)
 {
     foobar_camera_t* state = (foobar_camera_t*)arg;
     UNUSED(state);
+    UNUSED(ostream);
 
     printf("CAMERA STOP STREAMING\n");
 

@@ -5,8 +5,8 @@ protocol.Board.firmware_version proto3_singular_msgs:true
 protocol.Board.protocol_version proto3_singular_msgs:true
 protocol.Board.devices type:FT_POINTER
 
-# DeviceSerial
-protocol.DeviceSerial.uuid max_size:16 fixed_length:true
+# BoardSerial
+protocol.BoardSerial.uuid max_size:16 fixed_length:true
 
 # Device
 protocol.Device.name type:FT_POINTER
@@ -30,3 +30,7 @@ protocol.Dimension.labels type:FT_POINTER
 
 # OptionOneOf
 protocol.OptionOneOf.items type:FT_POINTER type:FT_POINTER
+
+# OptionBlob
+protocol.OptionBlob.current_value type:FT_POINTER
+protocol.OptionBlob.default_value type:FT_POINTER

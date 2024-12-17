@@ -14,7 +14,7 @@ class CustomBuildCommand(Command):
         pass
 
     def run(self):
-        proto_path = os.path.join(os.path.dirname(__file__), 'protocol')  # Adjust your proto path here
+        proto_path = os.path.join(os.path.dirname(__file__), '..', 'protocol')  # Adjust your proto path here
 
         # Run protoc commands to generate Python files from .proto files
         protoc.main([

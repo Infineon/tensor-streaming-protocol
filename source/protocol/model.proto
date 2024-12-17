@@ -10,11 +10,27 @@ message Version {
 }
 
 enum DeviceType {
+    // Not a valid device type
     DEVICE_TYPE_UNSPECIFIED = 0;
+
+    // The device is a sensor (e.g., IMU, microphone), typically only has output streams
     DEVICE_TYPE_SENSOR = 1;
+
+    // The device is a playback device (e.g., display, audio output), typically only has input streams
     DEVICE_TYPE_PLAYBACK = 2; 
+
+    // The device is a model, has at least one input and one output stream
     DEVICE_TYPE_MODEL = 3;  
-    DEVICE_TYPE_OTHER = 4;  
+
+    // Other device type
+    DEVICE_TYPE_OTHER = 4;
+    
+    // Loopback is the routing of data streams back to their source without intentional processing or modification.
+    // It is primarily a means of testing the communications reliability and bandwidth
+    DEVICE_TYPE_LOOPBACK = 5;
+
+    // Represents the board itself. This device usually has no streams
+    DEVICE_TYPE_BOARD = 6;
 }
 
 enum DeviceStatus {
@@ -32,15 +48,15 @@ enum DeviceStatus {
     DEVICE_STATUS_ERROR = 3;
 }
 
-message DeviceSerial {
+message BoardSerial {
     // 16 bytes long UUID
     bytes uuid = 1;
 }
 
 message Board {
     // Serial number identifier.
-    // This property is used by host software to uniquely identify a device.
-    DeviceSerial serial = 1;   
+    // This property is used by host software to uniquely identify a board.
+    BoardSerial serial = 1;   
 
     // User-friendly name for the device board.
     string name = 2;
@@ -102,6 +118,7 @@ message Option {
 	    OptionFloat float_type = 5;     // Float text field
         OptionBool bool_type = 6;       // Checkbox
         OptionOneOf oneof_type = 7;     // Dropdown list option
+        OptionBlob blob_type = 8;       // Binary object option
     };
 }
 
@@ -128,6 +145,7 @@ message StreamConfig {
     // For example, a 16-bit stereo microphone (shape [2]) with max_frame_count=100 may send 100 sample frames in each data chunk.
     // Maximum bytes in a DataChunk would then be: shape.flat * max_frame_count * sizeof(datatype) = 2 * 100 * 2 bytes
     // If the frequency is 16kHz, then 160 DataChunks per second should be expected if all DataChunks use the max frame count.
+    // For input streams this value may be -1, then the frame count is determined by DataInquire messages.
 	int32 max_frame_count = 6;
 
     // Optional unit name if available (e.g., m/s). Unicode characters are supported.
@@ -194,6 +212,11 @@ message OptionOneOf {
     int32 default_index = 1;
     int32 current_index = 2;
     repeated string items = 3;
+}
+
+message OptionBlob {
+    bytes current_value = 1;
+    bytes default_value = 2;
 }
 
 enum StreamDirection {

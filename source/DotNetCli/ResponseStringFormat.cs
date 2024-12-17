@@ -43,6 +43,10 @@ internal static class ResponseStringFormat
                     Line("Type", "OneOf");
                     Line("Value", option.OneofValue);
                     break;
+                case OptionValue.ValueOneofCase.BlobValue:
+                    Line("Type", "Blob");
+                    Line("Value", $"{option.BlobValue?.Length} bytes");
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -155,6 +159,11 @@ internal static class ResponseStringFormat
                         Line("Value", option.OneofType.CurrentIndex);
                         Line("Default", option.OneofType.DefaultIndex);
                         Line("One of Items", String.Join(", ", option.OneofType.Items));
+                        break;
+                    case Option.ValueOneofCase.BlobType:
+                        Line("Type", "Blob");
+                        Line("Value", $"{option.BlobType.CurrentValue.Length} bytes");
+                        Line("Default", $"{option.BlobType.DefaultValue.Length} bytes");
                         break;
                 }
                 indent -= 4;

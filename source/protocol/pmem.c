@@ -95,6 +95,22 @@ void pmem_free_plist(char** item)
 #endif
 }
 
+pb_bytes_array_t* pmem_alloc_blob(int size) {
+#ifdef PMEM_NO_MALLOC
+#error Not yet implemented
+#else
+	return (pb_bytes_array_t*)malloc(PB_BYTES_ARRAY_T_ALLOCSIZE(size));
+#endif
+}
+
+void pmem_free_blob(pb_bytes_array_t* blob) {
+#ifdef PMEM_NO_MALLOC
+#error Not yet implemented
+#else
+	free(blob);
+#endif
+}
+
 
 /******* protocol_Device *******/
 

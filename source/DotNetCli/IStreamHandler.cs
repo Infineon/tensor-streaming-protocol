@@ -10,6 +10,8 @@ public interface IStreamHandler
     // If false, a StopRequest message will be sent and
     // the writer will be removed.
     bool ProcessDataChunk(DataChunk data);
+
+    bool ProcessDataInquire(DataInquire data);
 }
 
 public readonly record struct StreamKey(int DeviceId, int StreamId);

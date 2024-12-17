@@ -36,13 +36,15 @@ public static class Program
                         return -1;
                     }
 
-                    testFile = args[index + 1];
+                    testFile = Path.GetFullPath(args[index + 1]);
 
                     if (!File.Exists(testFile))
                     {
                         Console.WriteLine($"Error: File not found {testFile}");
                         return -1;
                     }
+
+                    Environment.CurrentDirectory = Path.GetDirectoryName(testFile) ?? ".";
 
                     index++;
                     break;

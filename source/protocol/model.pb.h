@@ -11,11 +11,21 @@
 
 /* Enum definitions */
 typedef enum _protocol_DeviceType {
+    /* Not a valid device type */
     protocol_DeviceType_DEVICE_TYPE_UNSPECIFIED = 0,
+    /* The device is a sensor (e.g., IMU, microphone), typically only has output streams */
     protocol_DeviceType_DEVICE_TYPE_SENSOR = 1,
+    /* The device is a playback device (e.g., display, audio output), typically only has input streams */
     protocol_DeviceType_DEVICE_TYPE_PLAYBACK = 2,
+    /* The device is a model, has at least one input and one output stream */
     protocol_DeviceType_DEVICE_TYPE_MODEL = 3,
-    protocol_DeviceType_DEVICE_TYPE_OTHER = 4
+    /* Other device type */
+    protocol_DeviceType_DEVICE_TYPE_OTHER = 4,
+    /* Loopback is the routing of data streams back to their source without intentional processing or modification.
+ It is primarily a means of testing the communications reliability and bandwidth */
+    protocol_DeviceType_DEVICE_TYPE_LOOPBACK = 5,
+    /* Represents the board itself. This device usually has no streams */
+    protocol_DeviceType_DEVICE_TYPE_BOARD = 6
 } protocol_DeviceType;
 
 typedef enum _protocol_DeviceStatus {
@@ -65,15 +75,15 @@ typedef struct _protocol_Version {
     uint32_t revision;
 } protocol_Version;
 
-typedef struct _protocol_DeviceSerial {
+typedef struct _protocol_BoardSerial {
     /* 16 bytes long UUID */
     pb_byte_t uuid[16];
-} protocol_DeviceSerial;
+} protocol_BoardSerial;
 
 typedef struct _protocol_Board {
     /* Serial number identifier.
- This property is used by host software to uniquely identify a device. */
-    protocol_DeviceSerial serial;
+ This property is used by host software to uniquely identify a board. */
+    protocol_BoardSerial serial;
     /* User-friendly name for the device board. */
     char *name;
     /* Firmware version of the device. */
@@ -144,7 +154,8 @@ typedef struct _protocol_StreamConfig {
     /* Maximum number of frames in each DataChunk.
  For example, a 16-bit stereo microphone (shape [2]) with max_frame_count=100 may send 100 sample frames in each data chunk.
  Maximum bytes in a DataChunk would then be: shape.flat * max_frame_count * sizeof(datatype) = 2 * 100 * 2 bytes
- If the frequency is 16kHz, then 160 DataChunks per second should be expected if all DataChunks use the max frame count. */
+ If the frequency is 16kHz, then 160 DataChunks per second should be expected if all DataChunks use the max frame count.
+ For input streams this value may be -1, then the frame count is determined by DataInquire messages. */
     int32_t max_frame_count;
     /* Optional unit name if available (e.g., m/s). Unicode characters are supported. */
     char *unit;
@@ -191,6 +202,11 @@ typedef struct _protocol_OptionOneOf {
     char **items;
 } protocol_OptionOneOf;
 
+typedef struct _protocol_OptionBlob {
+    pb_bytes_array_t *current_value;
+    pb_bytes_array_t *default_value;
+} protocol_OptionBlob;
+
 /* Structure for device a option */
 typedef struct _protocol_Option {
     /* Unique ID for the option. */
@@ -205,6 +221,7 @@ typedef struct _protocol_Option {
         protocol_OptionFloat float_type; /* Float text field */
         protocol_OptionBool bool_type; /* Checkbox */
         protocol_OptionOneOf oneof_type; /* Dropdown list option */
+        protocol_OptionBlob blob_type; /* Binary object option */
     } value;
 } protocol_Option;
 
@@ -215,8 +232,8 @@ extern "C" {
 
 /* Helper constants for enums */
 #define _protocol_DeviceType_MIN protocol_DeviceType_DEVICE_TYPE_UNSPECIFIED
-#define _protocol_DeviceType_MAX protocol_DeviceType_DEVICE_TYPE_OTHER
-#define _protocol_DeviceType_ARRAYSIZE ((protocol_DeviceType)(protocol_DeviceType_DEVICE_TYPE_OTHER+1))
+#define _protocol_DeviceType_MAX protocol_DeviceType_DEVICE_TYPE_BOARD
+#define _protocol_DeviceType_ARRAYSIZE ((protocol_DeviceType)(protocol_DeviceType_DEVICE_TYPE_BOARD+1))
 
 #define _protocol_DeviceStatus_MIN protocol_DeviceStatus_DEVICE_STATUS_READY
 #define _protocol_DeviceStatus_MAX protocol_DeviceStatus_DEVICE_STATUS_ERROR
@@ -246,10 +263,11 @@ extern "C" {
 
 
 
+
 /* Initializer values for message structs */
 #define protocol_Version_init_default            {0, 0, 0, 0}
-#define protocol_DeviceSerial_init_default       {{0}}
-#define protocol_Board_init_default              {protocol_DeviceSerial_init_default, NULL, protocol_Version_init_default, protocol_Version_init_default, 0, 0, NULL}
+#define protocol_BoardSerial_init_default        {{0}}
+#define protocol_Board_init_default              {protocol_BoardSerial_init_default, NULL, protocol_Version_init_default, protocol_Version_init_default, 0, 0, NULL}
 #define protocol_Device_init_default             {0, NULL, NULL, _protocol_DeviceType_MIN, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL}
 #define protocol_Option_init_default             {0, NULL, NULL, 0, {protocol_OptionInt_init_default}}
 #define protocol_StreamConfig_init_default       {NULL, _protocol_StreamDirection_MIN, _protocol_DataType_MIN, 0, {protocol_Dimension_init_default, protocol_Dimension_init_default, protocol_Dimension_init_default, protocol_Dimension_init_default, protocol_Dimension_init_default, protocol_Dimension_init_default}, 0, 0, NULL, 0, 0, 0, 0, 0}
@@ -258,9 +276,10 @@ extern "C" {
 #define protocol_OptionFloat_init_default        {0, 0, 0, 0}
 #define protocol_OptionBool_init_default         {0, 0}
 #define protocol_OptionOneOf_init_default        {0, 0, 0, NULL}
+#define protocol_OptionBlob_init_default         {NULL, NULL}
 #define protocol_Version_init_zero               {0, 0, 0, 0}
-#define protocol_DeviceSerial_init_zero          {{0}}
-#define protocol_Board_init_zero                 {protocol_DeviceSerial_init_zero, NULL, protocol_Version_init_zero, protocol_Version_init_zero, 0, 0, NULL}
+#define protocol_BoardSerial_init_zero           {{0}}
+#define protocol_Board_init_zero                 {protocol_BoardSerial_init_zero, NULL, protocol_Version_init_zero, protocol_Version_init_zero, 0, 0, NULL}
 #define protocol_Device_init_zero                {0, NULL, NULL, _protocol_DeviceType_MIN, 0, NULL, 0, NULL, _protocol_DeviceStatus_MIN, NULL}
 #define protocol_Option_init_zero                {0, NULL, NULL, 0, {protocol_OptionInt_init_zero}}
 #define protocol_StreamConfig_init_zero          {NULL, _protocol_StreamDirection_MIN, _protocol_DataType_MIN, 0, {protocol_Dimension_init_zero, protocol_Dimension_init_zero, protocol_Dimension_init_zero, protocol_Dimension_init_zero, protocol_Dimension_init_zero, protocol_Dimension_init_zero}, 0, 0, NULL, 0, 0, 0, 0, 0}
@@ -269,13 +288,14 @@ extern "C" {
 #define protocol_OptionFloat_init_zero           {0, 0, 0, 0}
 #define protocol_OptionBool_init_zero            {0, 0}
 #define protocol_OptionOneOf_init_zero           {0, 0, 0, NULL}
+#define protocol_OptionBlob_init_zero            {NULL, NULL}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define protocol_Version_major_tag               1
 #define protocol_Version_minor_tag               2
 #define protocol_Version_build_tag               3
 #define protocol_Version_revision_tag            4
-#define protocol_DeviceSerial_uuid_tag           1
+#define protocol_BoardSerial_uuid_tag            1
 #define protocol_Board_serial_tag                1
 #define protocol_Board_name_tag                  2
 #define protocol_Board_firmware_version_tag      3
@@ -318,6 +338,8 @@ extern "C" {
 #define protocol_OptionOneOf_default_index_tag   1
 #define protocol_OptionOneOf_current_index_tag   2
 #define protocol_OptionOneOf_items_tag           3
+#define protocol_OptionBlob_current_value_tag    1
+#define protocol_OptionBlob_default_value_tag    2
 #define protocol_Option_option_id_tag            1
 #define protocol_Option_name_tag                 2
 #define protocol_Option_description_tag          3
@@ -325,6 +347,7 @@ extern "C" {
 #define protocol_Option_float_type_tag           5
 #define protocol_Option_bool_type_tag            6
 #define protocol_Option_oneof_type_tag           7
+#define protocol_Option_blob_type_tag            8
 
 /* Struct field encoding specification for nanopb */
 #define protocol_Version_FIELDLIST(X, a) \
@@ -335,10 +358,10 @@ X(a, STATIC,   SINGULAR, UINT32,   revision,          4)
 #define protocol_Version_CALLBACK NULL
 #define protocol_Version_DEFAULT NULL
 
-#define protocol_DeviceSerial_FIELDLIST(X, a) \
+#define protocol_BoardSerial_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, FIXED_LENGTH_BYTES, uuid,              1)
-#define protocol_DeviceSerial_CALLBACK NULL
-#define protocol_DeviceSerial_DEFAULT NULL
+#define protocol_BoardSerial_CALLBACK NULL
+#define protocol_BoardSerial_DEFAULT NULL
 
 #define protocol_Board_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, MESSAGE,  serial,            1) \
@@ -349,7 +372,7 @@ X(a, STATIC,   SINGULAR, INT32,    watchdog_timeout,   5) \
 X(a, POINTER,  REPEATED, MESSAGE,  devices,           6)
 #define protocol_Board_CALLBACK NULL
 #define protocol_Board_DEFAULT NULL
-#define protocol_Board_serial_MSGTYPE protocol_DeviceSerial
+#define protocol_Board_serial_MSGTYPE protocol_BoardSerial
 #define protocol_Board_firmware_version_MSGTYPE protocol_Version
 #define protocol_Board_protocol_version_MSGTYPE protocol_Version
 #define protocol_Board_devices_MSGTYPE protocol_Device
@@ -375,13 +398,15 @@ X(a, POINTER,  SINGULAR, STRING,   description,       3) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (value,int_type,value.int_type),   4) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (value,float_type,value.float_type),   5) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (value,bool_type,value.bool_type),   6) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (value,oneof_type,value.oneof_type),   7)
+X(a, STATIC,   ONEOF,    MESSAGE,  (value,oneof_type,value.oneof_type),   7) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (value,blob_type,value.blob_type),   8)
 #define protocol_Option_CALLBACK NULL
 #define protocol_Option_DEFAULT NULL
 #define protocol_Option_value_int_type_MSGTYPE protocol_OptionInt
 #define protocol_Option_value_float_type_MSGTYPE protocol_OptionFloat
 #define protocol_Option_value_bool_type_MSGTYPE protocol_OptionBool
 #define protocol_Option_value_oneof_type_MSGTYPE protocol_OptionOneOf
+#define protocol_Option_value_blob_type_MSGTYPE protocol_OptionBlob
 
 #define protocol_StreamConfig_FIELDLIST(X, a) \
 X(a, POINTER,  SINGULAR, STRING,   name,              1) \
@@ -436,8 +461,14 @@ X(a, POINTER,  REPEATED, STRING,   items,             3)
 #define protocol_OptionOneOf_CALLBACK NULL
 #define protocol_OptionOneOf_DEFAULT NULL
 
+#define protocol_OptionBlob_FIELDLIST(X, a) \
+X(a, POINTER,  SINGULAR, BYTES,    current_value,     1) \
+X(a, POINTER,  SINGULAR, BYTES,    default_value,     2)
+#define protocol_OptionBlob_CALLBACK NULL
+#define protocol_OptionBlob_DEFAULT NULL
+
 extern const pb_msgdesc_t protocol_Version_msg;
-extern const pb_msgdesc_t protocol_DeviceSerial_msg;
+extern const pb_msgdesc_t protocol_BoardSerial_msg;
 extern const pb_msgdesc_t protocol_Board_msg;
 extern const pb_msgdesc_t protocol_Device_msg;
 extern const pb_msgdesc_t protocol_Option_msg;
@@ -447,10 +478,11 @@ extern const pb_msgdesc_t protocol_OptionInt_msg;
 extern const pb_msgdesc_t protocol_OptionFloat_msg;
 extern const pb_msgdesc_t protocol_OptionBool_msg;
 extern const pb_msgdesc_t protocol_OptionOneOf_msg;
+extern const pb_msgdesc_t protocol_OptionBlob_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define protocol_Version_fields &protocol_Version_msg
-#define protocol_DeviceSerial_fields &protocol_DeviceSerial_msg
+#define protocol_BoardSerial_fields &protocol_BoardSerial_msg
 #define protocol_Board_fields &protocol_Board_msg
 #define protocol_Device_fields &protocol_Device_msg
 #define protocol_Option_fields &protocol_Option_msg
@@ -460,6 +492,7 @@ extern const pb_msgdesc_t protocol_OptionOneOf_msg;
 #define protocol_OptionFloat_fields &protocol_OptionFloat_msg
 #define protocol_OptionBool_fields &protocol_OptionBool_msg
 #define protocol_OptionOneOf_fields &protocol_OptionOneOf_msg
+#define protocol_OptionBlob_fields &protocol_OptionBlob_msg
 
 /* Maximum encoded size of messages (where known) */
 /* protocol_Board_size depends on runtime parameters */
@@ -468,8 +501,9 @@ extern const pb_msgdesc_t protocol_OptionOneOf_msg;
 /* protocol_StreamConfig_size depends on runtime parameters */
 /* protocol_Dimension_size depends on runtime parameters */
 /* protocol_OptionOneOf_size depends on runtime parameters */
+/* protocol_OptionBlob_size depends on runtime parameters */
 #define PROTOCOL_MODEL_PB_H_MAX_SIZE             protocol_OptionInt_size
-#define protocol_DeviceSerial_size               18
+#define protocol_BoardSerial_size                18
 #define protocol_OptionBool_size                 4
 #define protocol_OptionFloat_size                20
 #define protocol_OptionInt_size                  44

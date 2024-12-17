@@ -38,6 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+    <None Include="devices\model\test\input_output.test" />
     <None Include="Makefile" />
   </ItemGroup>
   <ItemGroup>
@@ -45,6 +46,9 @@
     <ClInclude Include="devices\mic\mic.h" />
     <ClInclude Include="devices\model\keyword_spotter.h" />
     <ClInclude Include="devices\model\model.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="devices\model\test\input.wav" />
   </ItemGroup>
   <ItemDefinitionGroup />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

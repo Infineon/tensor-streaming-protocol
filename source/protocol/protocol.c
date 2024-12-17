@@ -167,6 +167,9 @@ static bool protocol_process_config_request(
 		case protocol_OptionValue_oneof_value_tag:
 			status = protocol_set_option_oneof(protocol, device_id, option_id, option->value.oneof_value);
 			break;
+	     case protocol_OptionValue_blob_value_tag:
+			status = protocol_set_option_blob(protocol, device_id, option_id, option->value.blob_value);
+			break;
 		}
 
 		// Abort on error, but keep the connection open, unless failed to send the error
@@ -213,6 +216,10 @@ static bool protocol_process_config_request(
 			target->which_value = protocol_OptionValue_oneof_value_tag;
 			target->value.oneof_value = source->value.oneof_type.current_index;
 			break;
+		case protocol_Option_blob_type_tag:
+			target->which_value = protocol_OptionValue_blob_value_tag;
+			target->value.blob_value = source->value.blob_type.current_value;
+			break;
 		}
 	}
 	response_msg->streams_count = device->streams_count;
@@ -248,7 +255,7 @@ static bool protocol_process_start_request(
 	protocol_DeviceStatus status = board->devices[device_id].status;
 	if (start_fn != NULL
 		&& (status == protocol_DeviceStatus_DEVICE_STATUS_READY || status == protocol_DeviceStatus_DEVICE_STATUS_ERROR)) {
-		start_fn(protocol, device_id, manager->arg);
+		start_fn(protocol, device_id, ostream, manager->arg);
 	}
 
 	return true;
@@ -277,7 +284,7 @@ static bool protocol_process_stop_request(
 		protocol_DeviceStatus status = board->devices[device_id].status;
 		if (stop_fn != NULL 
 			&& (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT)) {
-			stop_fn(protocol, device_id, manager->arg);
+			stop_fn(protocol, device_id, ostream, manager->arg);
 		}
 	}
 	else {
@@ -287,7 +294,7 @@ static bool protocol_process_stop_request(
 			protocol_DeviceStatus status = board->devices[i].status;
 			if (stop_fn != NULL 
 				&& (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT)) {
-				stop_fn(protocol, i, manager->arg);
+				stop_fn(protocol, i, ostream, manager->arg);
 			}
 		}
 	}
@@ -347,7 +354,7 @@ static bool protocol_process_data_chunk(pb_istream_t* istream, const pb_field_t*
 		return true;
 	}
 
-	if (request->frame_count > stream->max_frame_count) {
+	if (stream->max_frame_count != -1 && request->frame_count > stream->max_frame_count) {
 		protocol_send_error_code(PROTOCOL_STATUS_FRAME_COUNT_EXCEEDED, ostream);
 		istream->bytes_left = 0;
 		return true;
@@ -471,8 +478,14 @@ void protocol_delete(protocol_t* protocol)
 			protocol_clear_streams(protocol, i);
 			for (int j = 0; j < device->options_count; j++) {
 				protocol_Option* option = &device->options[j];
-				if (option->which_value == protocol_Option_oneof_type_tag)
+				if (option->which_value == protocol_Option_oneof_type_tag) {
 					pmem_free_plist(option->value.oneof_type.items);
+				} else if (option->which_value == protocol_Option_blob_type_tag) {
+					if(option->value.blob_type.current_value != NULL)
+					    pmem_free_blob(option->value.blob_type.current_value);
+					if (option->value.blob_type.default_value != NULL)
+					    pmem_free_blob(option->value.blob_type.default_value);
+				}
 			}
 			pmem_free_Option(device->options);
 		}
@@ -821,6 +834,83 @@ int protocol_get_option_oneof(
 	return PROTOCOL_STATUS_SUCCESS;
 }
 
+int protocol_add_option_blob(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	const char* name,
+	const char* description,
+	pb_bytes_array_t* default_value)
+{
+	if (protocol == NULL || name == NULL)
+		return PROTOCOL_STATUS_NULL_ARGUMENT;
+
+	protocol_Board* board = &protocol->board;
+
+	if (device_id < 0 || device_id >= board->devices_count)
+		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
+
+	protocol_Device* device = &board->devices[device_id];
+	protocol_Option* option = protocol_create_option(device, option_id, name, description);
+	if (option == NULL)
+		return PROTOCOL_STATUS_MEMORY_ERROR;
+
+	option->which_value = protocol_Option_blob_type_tag;
+	option->value.blob_type.default_value = default_value;
+	option->value.blob_type.current_value = default_value;
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
+int protocol_set_option_blob(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	pb_bytes_array_t* value)
+{
+	protocol_Option* option;
+	int status = protocol_find_option(protocol, device_id, option_id, &option);
+	if (status != PROTOCOL_STATUS_SUCCESS)
+		return status;
+
+	if (option->which_value != protocol_Option_blob_type_tag)
+		return PROTOCOL_STATUS_INVALID_OPTION_TYPE;
+
+	if (option->value.blob_type.current_value != NULL) {
+		pmem_free_blob(option->value.blob_type.current_value);
+	}
+
+	if (value == NULL) {
+		option->value.blob_type.current_value = NULL;
+	}
+	else {
+		pb_bytes_array_t* copy = pmem_alloc_blob(value->size);
+		memcpy(copy, value, PB_BYTES_ARRAY_T_ALLOCSIZE(value->size));
+		option->value.blob_type.current_value = copy;
+	}
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
+int protocol_get_option_blob(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	pb_bytes_array_t** value)
+{
+	protocol_Option* option;
+	int status = protocol_find_option(protocol, device_id, option_id, &option);
+	if (status != PROTOCOL_STATUS_SUCCESS)
+		return status;
+
+	if (option->which_value != protocol_Option_blob_type_tag)
+		return PROTOCOL_STATUS_INVALID_OPTION_TYPE;
+
+	*value = option->value.blob_type.current_value;
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
 int protocol_clear_streams(protocol_t* protocol, int device_id) 
 {
 	if (protocol == NULL)
@@ -856,7 +946,7 @@ int protocol_add_stream(
 	const char* name,
 	protocol_StreamDirection direction,
 	protocol_DataType datatype,
-	int frequency,
+	float frequency,
 	int32_t max_frame_count,
 	const char* unit)
 {
@@ -1014,7 +1104,7 @@ int protocol_process_request(
 	request.cb_request_type.arg = args;
 
 	if (!pb_decode_ex(istream, protocol_Request_fields, &request, PB_DECODE_DELIMITED))
-	    return PROTOCOL_STATUS_FAILED_TO_DECODE_REQUEST;
+		return PROTOCOL_STATUS_FAILED_TO_DECODE_REQUEST;
 
 	switch (request.which_request_type) 
 	{
@@ -1245,6 +1335,13 @@ int protocol_get_datatype_size(protocol_DataType type)
 	case protocol_DataType_DATA_TYPE_S32: return 4;
 	case protocol_DataType_DATA_TYPE_F32: return 4;
 	case protocol_DataType_DATA_TYPE_F64: return 8;
+	case protocol_DataType_DATA_TYPE_Q7: return 1;
+	case protocol_DataType_DATA_TYPE_Q15: return 2;
+	case protocol_DataType_DATA_TYPE_Q31: return 4;
+	case protocol_DataType_DATA_TYPE_D8: return 1;
+	case protocol_DataType_DATA_TYPE_D16: return 2;
+	case protocol_DataType_DATA_TYPE_D32: return 4;
+
 	default: return -1;
 	}
 }

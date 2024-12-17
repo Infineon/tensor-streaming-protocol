@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Protocol;
 
@@ -8,8 +9,7 @@ internal class StreamMeasure : StreamHandlerBase
 {
     private readonly RunningStatistics _statisticsTotal;
     private List<RunningStatistics>? _statistics;
-    private DateTime? _startTime;
-    private DateTime? _prevTime;
+    private TimeSpan? _prevTime;
     private int _currentFrameNumber;
     private int _framesReceived;
     private int _framesLeft;
@@ -18,6 +18,7 @@ internal class StreamMeasure : StreamHandlerBase
     private TimeSpan _maxTimeDelta;
     private TimeSpan _clockDrift;
     private IClient _client;
+    private Stopwatch _stopwatch;
 
     public StreamMeasure(IClient client, int count) : base(client)
     {
@@ -26,10 +27,14 @@ internal class StreamMeasure : StreamHandlerBase
         _statisticsTotal = new();
         _maxTimeDelta = TimeSpan.Zero;
         _clockDrift = TimeSpan.Zero;
+        _stopwatch = new Stopwatch();
     }
 
     public override void Start(StreamConfig stream)
     {
+        if (Stream != null)
+            return;
+
         base.Start(stream);
 
         var estimated = TimeSpan.FromSeconds(_framesLeft / stream.Frequency);
@@ -52,8 +57,8 @@ internal class StreamMeasure : StreamHandlerBase
         if (Stream == null || _framesLeft == 0)
             return false;
 
-        var now = DateTime.UtcNow; 
-        _startTime ??= now;
+        _stopwatch.Start();
+        var now = _stopwatch.Elapsed;
 
         _chunksReceived++;
         _framesReceived += data.FrameCount;
@@ -67,29 +72,21 @@ internal class StreamMeasure : StreamHandlerBase
 
         var dropped = data.FrameNumber - _currentFrameNumber;
 
-        // if (dropped != 0)
-        //    Client.WriteLine($"Dropped {dropped} frames.");
-        
-        var startDelta = now - _startTime.Value;
+        if(_currentFrameNumber > 0)
+            _clockDrift = now - TimeSpan.FromSeconds(_currentFrameNumber / (double)Stream.Frequency);
 
-        if(startDelta > TimeSpan.Zero)
-            _clockDrift = startDelta - TimeSpan.FromSeconds((data.FrameNumber + data.FrameCount) / (double)Stream.Frequency);
-
-        TimeSpan delta = TimeSpan.Zero;
         if (_prevTime.HasValue)
         {
-            delta = ((now - _prevTime.Value) - TimeSpan.FromSeconds((dropped + data.FrameCount) / (double)Stream.Frequency)).Duration();
+            var delta = ((now - _prevTime.Value) - TimeSpan.FromSeconds((dropped + data.FrameCount) / (double)Stream.Frequency)).Duration();
             if (delta > _maxTimeDelta)
                 _maxTimeDelta = delta;
         }
-
-        // WriteLine($"Chunk {_chunksReceived}: Measured Error {(int)delta.TotalMilliseconds} milliseconds. Frames: {data.FrameCount} Dropped: {dropped}");
 
         _prevTime = now;
         _currentFrameNumber = data.FrameNumber + data.FrameCount;
         _totalDropped += dropped;
         
-        var converted = ToDoubles(ElementType, data.Payload.Span);
+        var converted = ToDoubles(data.Payload.Span);
 
         _framesLeft -= dropped;
 

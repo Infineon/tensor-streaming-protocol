@@ -38,6 +38,7 @@ typedef struct _protocol_OptionValue {
         float float_value; /* Floating-point value */
         bool bool_value; /* Boolean value */
         int32_t oneof_value; /* Index into OptionOneOf items */
+        pb_bytes_array_t *blob_value; /* Blob value */
     } value;
 } protocol_OptionValue;
 
@@ -214,6 +215,7 @@ extern "C" {
 #define protocol_OptionValue_float_value_tag     3
 #define protocol_OptionValue_bool_value_tag      4
 #define protocol_OptionValue_oneof_value_tag     5
+#define protocol_OptionValue_blob_value_tag      6
 #define protocol_DeviceConfigurationRequest_device_tag 1
 #define protocol_DeviceConfigurationRequest_options_tag 2
 #define protocol_DeviceConfigurationRequest_tag_tag 3
@@ -302,7 +304,8 @@ X(a, STATIC,   SINGULAR, INT32,    option_id,         1) \
 X(a, STATIC,   ONEOF,    INT32,    (value,int_value,value.int_value),   2) \
 X(a, STATIC,   ONEOF,    FLOAT,    (value,float_value,value.float_value),   3) \
 X(a, STATIC,   ONEOF,    BOOL,     (value,bool_value,value.bool_value),   4) \
-X(a, STATIC,   ONEOF,    INT32,    (value,oneof_value,value.oneof_value),   5)
+X(a, STATIC,   ONEOF,    INT32,    (value,oneof_value,value.oneof_value),   5) \
+X(a, POINTER,  ONEOF,    BYTES,    (value,blob_value,value.blob_value),   6)
 #define protocol_OptionValue_CALLBACK NULL
 #define protocol_OptionValue_DEFAULT NULL
 
@@ -413,6 +416,7 @@ extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
 /* protocol_Request_size depends on runtime parameters */
 /* protocol_Response_size depends on runtime parameters */
 /* protocol_BoardCapabilitiesResponse_size depends on runtime parameters */
+/* protocol_OptionValue_size depends on runtime parameters */
 /* protocol_DeviceConfigurationRequest_size depends on runtime parameters */
 /* protocol_DeviceConfigurationResponse_size depends on runtime parameters */
 /* protocol_DataChunk_size depends on runtime parameters */
@@ -420,7 +424,6 @@ extern const pb_msgdesc_t protocol_WatchdogResetRequest_msg;
 #define PROTOCOL_PROTOCOL_PB_H_MAX_SIZE          protocol_DataInquire_size
 #define protocol_BoardCapabilitiesRequest_size   17
 #define protocol_DataInquire_size                33
-#define protocol_OptionValue_size                22
 #define protocol_ResetRequest_size               0
 #define protocol_StartRequest_size               11
 #define protocol_StopRequest_size                6

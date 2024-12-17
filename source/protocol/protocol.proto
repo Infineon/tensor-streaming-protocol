@@ -62,6 +62,7 @@ message OptionValue {
         float float_value = 3;  // Floating-point value
         bool bool_value = 4;    // Boolean value
         int32 oneof_value = 5;  // Index into OptionOneOf items
+        bytes blob_value = 6;   // Blob value
     }
 }
 

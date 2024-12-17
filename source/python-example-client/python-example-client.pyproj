@@ -23,9 +23,7 @@
   <ItemGroup>
     <Compile Include="main.py" />
     <Compile Include="model_pb2.py" />
-    <Compile Include="model_pb2_grpc.py" />
     <Compile Include="protocol_pb2.py" />
-    <Compile Include="protocol_pb2_grpc.py" />
     <Compile Include="setup.py" />
   </ItemGroup>
   <ItemGroup>

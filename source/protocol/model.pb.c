@@ -9,7 +9,7 @@
 PB_BIND(protocol_Version, protocol_Version, AUTO)
 
 
-PB_BIND(protocol_DeviceSerial, protocol_DeviceSerial, AUTO)
+PB_BIND(protocol_BoardSerial, protocol_BoardSerial, AUTO)
 
 
 PB_BIND(protocol_Board, protocol_Board, AUTO)
@@ -37,6 +37,9 @@ PB_BIND(protocol_OptionBool, protocol_OptionBool, AUTO)
 
 
 PB_BIND(protocol_OptionOneOf, protocol_OptionOneOf, AUTO)
+
+
+PB_BIND(protocol_OptionBlob, protocol_OptionBlob, AUTO)
 
 
 

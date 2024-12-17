@@ -19,7 +19,8 @@ public abstract class StreamHandlerBase : IStreamHandler
     public virtual void Start(StreamConfig stream)
     {
         if (Stream != null)
-            throw new InvalidDataException("Stream already in progress. ");
+            return;
+
         Stream = stream;
 
         ElementCount = 1;
@@ -45,13 +46,93 @@ public abstract class StreamHandlerBase : IStreamHandler
         };
     }
 
-    public abstract bool ProcessDataChunk(DataChunk data);
+    public virtual bool ProcessDataChunk(DataChunk data) => true;
 
-    protected double[] ToDoubles(DataType type, ReadOnlySpan<byte> bytes)
+    public virtual bool ProcessDataInquire(DataInquire data) => true;
+
+    protected byte[] NormalizedToBytesSaturating(double[] normalized)
+    {
+        var result = new List<byte>(ElementCount * ElementSize);
+        switch (ElementType)
+        {
+            case DataType.U8:
+                foreach (var value in normalized)
+                {
+                    var sat = byte.CreateSaturating(value * byte.MaxValue);
+                    result.Add(sat);
+                }
+                break;
+            case DataType.S8:
+                foreach (var value in normalized)
+                {
+                    var sat = sbyte.CreateSaturating(value * sbyte.MaxValue);
+                    result.Add(unchecked((byte)sat));
+                }
+                break;
+            case DataType.U16:
+                foreach (var value in normalized)
+                {
+                    var sat = ushort.CreateSaturating(value * ushort.MaxValue);
+                    result.AddRange(BitConverter.GetBytes(sat));
+                }
+                break;
+            case DataType.S16:
+                foreach (var value in normalized)
+                {
+                    var sat = short.CreateSaturating(value * short.MaxValue);
+                    result.AddRange(BitConverter.GetBytes(sat));
+                }
+                break;
+            case DataType.U32:
+                foreach (var value in normalized)
+                {
+                    var sat = uint.CreateSaturating(value * uint.MaxValue);
+                    result.AddRange(BitConverter.GetBytes(sat));
+                }
+                break;
+            case DataType.S32:
+                foreach (var value in normalized)
+                {
+                    var sat = int.CreateSaturating(value * int.MaxValue);
+                    result.AddRange(BitConverter.GetBytes(sat));
+                }
+                break;
+            case DataType.F32:
+                foreach (var value in normalized)
+                {
+                    result.AddRange(BitConverter.GetBytes((float)value));
+                }
+                break;
+            case DataType.F64:
+                foreach (var value in normalized)
+                {
+                    result.AddRange(BitConverter.GetBytes((double)value));
+                }
+                break;
+            case DataType.Q7:
+            case DataType.Q15:
+            case DataType.Q31:
+                throw new NotImplementedException("Not yet implemented.");
+            case DataType.D8:
+            case DataType.D16:
+            case DataType.D32:
+                throw new NotImplementedException("Not yet implemented.");
+            case DataType.Unknown:
+                throw new NotSupportedException();
+           
+            default:
+                throw new ArgumentOutOfRangeException(nameof(ElementType), ElementType, null);
+        }
+
+        return result.ToArray();
+    }
+
+
+    protected double[] ToDoubles(ReadOnlySpan<byte> bytes)
     {
         double[] result;
 
-        switch (type)
+        switch (ElementType)
         {
             case DataType.U8:
                 result = new double[bytes.Length];
@@ -92,11 +173,19 @@ public abstract class StreamHandlerBase : IStreamHandler
                 result = new double[f64Span.Length];
                 for (int i = 0; i < f64Span.Length; i++) result[i] = f64Span[i];
                 break;
+            case DataType.Q7:
+            case DataType.Q15:
+            case DataType.Q31:
+                throw new NotImplementedException("Not yet implemented.");
+            case DataType.D8:
+            case DataType.D16:
+            case DataType.D32:
+                throw new NotImplementedException("Not yet implemented.");
             case DataType.Unknown:
                 result = new double[0];
                 break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(type), type, null);
+                throw new ArgumentOutOfRangeException(nameof(ElementType), ElementType, null);
         }
 
         return result;

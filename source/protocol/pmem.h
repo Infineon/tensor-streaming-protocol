@@ -30,6 +30,8 @@ void pmem_free_protocol(protocol_t* item);
 char** pmem_alloc_plist(int count);
 void pmem_free_plist(char** item);
 
+pb_bytes_array_t* pmem_alloc_blob(int size);
+void pmem_free_blob(pb_bytes_array_t* blob);
 
 /* realloc - free */
 protocol_Device* pmem_realloc_Device(protocol_Device* old, int new_count);

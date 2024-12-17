@@ -23,7 +23,7 @@ import serial.tools.list_ports
 import numpy as np
 
 # Constants
-SERIAL_PORT = 'COM5'
+SERIAL_PORT = 'COM25'
 BAUD_RATE = 115200
 
 def encode_varint(value):

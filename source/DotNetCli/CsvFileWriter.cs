@@ -22,6 +22,9 @@ public class CsvWriter : StreamHandlerBase
 
     public override void Start(StreamConfig stream)
     {
+        if (Stream != null)
+            return;
+
         base.Start(stream);
 
         var estimated = TimeSpan.FromSeconds(_framesLeft / stream.Frequency);
@@ -52,7 +55,7 @@ public class CsvWriter : StreamHandlerBase
                 return false;
             }
 
-            var converted = ToDoubles(ElementType, data.Payload.Span);
+            var converted = ToDoubles(data.Payload.Span);
             for (int i = 0; i < data.FrameCount && _framesLeft > 0; i++)
             {
                 WriteLine(converted.AsSpan(i * ElementCount, ElementCount));

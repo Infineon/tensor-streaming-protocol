@@ -29,3 +29,6 @@ protocol.DeviceConfigurationResponse.status_message type:FT_POINTER
 
 # ErrorResponse
 protocol.ErrorResponse.error_message type:FT_POINTER
+
+# OptionValue Blob
+protocol.OptionValue.blob_value type:FT_POINTER
