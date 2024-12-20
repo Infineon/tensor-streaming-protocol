@@ -47,6 +47,14 @@ internal static class ResponseStringFormat
                     Line("Type", "Blob");
                     Line("Value", $"{option.BlobValue?.Length} bytes");
                     break;
+                case OptionValue.ValueOneofCase.StringValue:
+                    Line("Type", "String");
+                    Line("Value", $"\"{option.StringValue}\"");
+                    break;
+                case OptionValue.ValueOneofCase.PasswordValue:
+                    Line("Type", "Password");
+                    Line("Value", $"{option.PasswordValue}");
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -164,6 +172,15 @@ internal static class ResponseStringFormat
                         Line("Type", "Blob");
                         Line("Value", $"{option.BlobType.CurrentValue.Length} bytes");
                         Line("Default", $"{option.BlobType.DefaultValue.Length} bytes");
+                        break;
+                    case Option.ValueOneofCase.StringType:
+                        Line("Type", "String");
+                        Line("Value", $"{option.StringType.CurrentValue}");
+                        Line("Default", $"{option.StringType.DefaultValue}");
+                        break;
+                    case Option.ValueOneofCase.PasswordType:
+                        Line("Type", "Password");
+                        Line("Value", $"{option.PasswordType.CurrentValue}");
                         break;
                 }
                 indent -= 4;

@@ -32,3 +32,9 @@ protocol.ErrorResponse.error_message type:FT_POINTER
 
 # OptionValue Blob
 protocol.OptionValue.blob_value type:FT_POINTER
+
+# OptionValue 
+protocol.OptionValue.string_value type:FT_POINTER
+
+# OptionValue Blob
+protocol.OptionValue.password_value type:FT_POINTER

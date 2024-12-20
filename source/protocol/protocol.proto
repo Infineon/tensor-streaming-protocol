@@ -58,11 +58,13 @@ message OptionValue {
     int32 option_id = 1;
 
     oneof value {
-        int32 int_value = 2;    // Integer value
-        float float_value = 3;  // Floating-point value
-        bool bool_value = 4;    // Boolean value
-        int32 oneof_value = 5;  // Index into OptionOneOf items
-        bytes blob_value = 6;   // Blob value
+        int32 int_value = 2;       // Integer value
+        float float_value = 3;     // Floating-point value
+        bool bool_value = 4;       // Boolean value
+        int32 oneof_value = 5;     // Index into OptionOneOf items
+        bytes blob_value = 6;      // Blob value
+        string string_value = 7;   // String value
+        string password_value = 8; // String value (hidden)
     }
 }
 

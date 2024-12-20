@@ -42,6 +42,12 @@ PB_BIND(protocol_OptionOneOf, protocol_OptionOneOf, AUTO)
 PB_BIND(protocol_OptionBlob, protocol_OptionBlob, AUTO)
 
 
+PB_BIND(protocol_OptionString, protocol_OptionString, AUTO)
+
+
+PB_BIND(protocol_OptionPassword, protocol_OptionPassword, AUTO)
+
+
 
 
 

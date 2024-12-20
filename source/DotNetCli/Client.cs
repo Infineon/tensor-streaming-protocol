@@ -232,7 +232,9 @@ public class Client : IClient
         WriteLine(" set int <option> <value>               Set an integer option on the selected device.");
         WriteLine(" set float <option> <value>             Set a decimal (floating-point) option on the selected device.");
         WriteLine(" set index <option> <value>             Set an index option on the selected device.");
-        WriteLine(" set blob <option> <file.bin>           Set an binary option on the selected device.");
+        WriteLine(" set blob <option> <file.bin>           Set a binary option on the selected device.");
+        WriteLine(" set string <option> <value>            Set a string option on the selected device.");
+        WriteLine(" set password <option> <value>          Set a password option on the selected device.");
         WriteLine(" update                                 Send the updated options to the selected device.");
         WriteLine(" clear                                  Clear any queued updates waiting to be sent to the device.");
         WriteLine(" stop                                   Stop all data streams on the selected device.");
@@ -457,6 +459,52 @@ public class Client : IClient
             }
         }
         Config.Options.Add(new OptionValue { OptionId = optionId, FloatValue = floatValue });
+        if (Interactive)
+            WriteLine($"{Config.Options.Count} update(s) pending with 'update'.");
+    }
+
+    private void SetStringCommand(string optionStr, string valueStr)
+    {
+        if (!int.TryParse(optionStr, out int optionId))
+        {
+            ErrorMessage($"Unable to parse <option> integer argument {optionStr}.");
+            return;
+        }
+
+        foreach (var option in Config.Options)
+        {
+            if (option.OptionId == optionId)
+            {
+                option.StringValue = valueStr;
+                if (Interactive)
+                    WriteLine($"Updated previous value. Still {Config.Options.Count} update(s) pending.");
+                return;
+            }
+        }
+        Config.Options.Add(new OptionValue { OptionId = optionId, StringValue = valueStr });
+        if (Interactive)
+            WriteLine($"{Config.Options.Count} update(s) pending with 'update'.");
+    }
+
+    private void SetPasswordCommand(string optionStr, string valueStr)
+    {
+        if (!int.TryParse(optionStr, out int optionId))
+        {
+            ErrorMessage($"Unable to parse <option> integer argument {optionStr}.");
+            return;
+        }
+
+        foreach (var option in Config.Options)
+        {
+            if (option.OptionId == optionId)
+            {
+                option.PasswordValue = valueStr;
+                if (Interactive)
+                    WriteLine($"Updated previous value. Still {Config.Options.Count} update(s) pending.");
+                return;
+            }
+        }
+        Config.Options.Add(new OptionValue { OptionId = optionId, PasswordValue = valueStr });
         if (Interactive)
             WriteLine($"{Config.Options.Count} update(s) pending with 'update'.");
     }
@@ -741,6 +789,12 @@ public class Client : IClient
                 break;
             case ["set", "blob", var option, var file]:
                 SetBlobCommand(option, file);
+                break;
+            case ["set", "string" or "s", var option, var value]:
+                SetStringCommand(option, value);
+                break;
+            case ["set", "password", var option, var value]:
+                SetPasswordCommand(option, value);
                 break;
             case ["update"]:
                 UpdateCommand();

@@ -31,7 +31,24 @@
 #include "pb_common.h"
 #include "pb.h"
 
-#include "pmem.h"
+#ifndef pmem_malloc
+#define pmem_malloc(size) malloc(size)
+#endif
+
+#ifndef pmem_realloc
+#define pmem_realloc(ptr, size) realloc(ptr, size)
+#endif
+
+#ifndef pmem_free
+#define pmem_free(ptr) free(ptr)
+#endif
+
+// Helper structure to save password during queries.
+// Passwords are masked and can not be retrieved from queries.
+typedef struct {
+	protocol_Option* option;
+	char* original_password;
+} password_backup_t;
 
 
 /*****************************************************************************
@@ -45,7 +62,7 @@ static protocol_Option* protocol_create_option(
 	const char* description)
 {
 	int option_index = device->options_count++;
-	device->options = pmem_realloc_Option(device->options, device->options_count);
+	device->options = (protocol_Option*)pmem_realloc(device->options, sizeof(protocol_Option) * device->options_count);
 	if (device->options == NULL)
 		return NULL;
 	protocol_Option* option = &device->options[option_index];
@@ -90,6 +107,20 @@ static int protocol_find_option(
     return PROTOCOL_STATUS_SUCCESS;
 }
 
+// Helper function to save passwords and mask them out
+static void save_and_mask_passwords(protocol_Device* device, password_backup_t** backups, size_t* backup_count) {
+	for (pb_size_t j = 0; j < device->options_count; ++j) {
+		protocol_Option* option = &device->options[j];
+		if (option->which_value == protocol_Option_password_type_tag) {
+			(*backup_count)++;
+			*backups = (password_backup_t *)pmem_realloc(*backups, *backup_count * sizeof(password_backup_t));
+			(*backups)[*backup_count - 1].option = option;
+			(*backups)[*backup_count - 1].original_password = option->value.password_type.current_value;
+			option->value.password_type.current_value = "(hidden)";  // Mask out the password
+		}
+	}
+}
+
 // return true to keep the connection open, false to close
 static bool protocol_process_capabilities_request(
 	protocol_t* protocol,
@@ -107,6 +138,10 @@ static bool protocol_process_capabilities_request(
 
 	int request_filter = request->request_type.capabilities.device;
 
+	password_backup_t* backups = NULL;
+	size_t backup_count = 0;
+
+	// request_filter is 0 or positive send only device config.
 	if (request_filter >= 0) {
 		if (request_filter >= board->devices_count)
 			return protocol_send_error_code(PROTOCOL_STATUS_NO_SUCH_DEVICE, ostream);
@@ -119,17 +154,28 @@ static bool protocol_process_capabilities_request(
 		response_board.devices = &board->devices[request_filter];
 		response.response_type.capabilities.board = &response_board;
 
-		// response_board must be in scope!
-		if (!pb_encode_ex(ostream, protocol_Response_fields, &response, PB_ENCODE_DELIMITED))
-			return false; // Close the connection
-	}
-	else {
-		response.response_type.capabilities.board = board;	// Use state object
-		if (!pb_encode_ex(ostream, protocol_Response_fields, &response, PB_ENCODE_DELIMITED))
-			return false; // Close the connection
+		save_and_mask_passwords(&board->devices[request_filter], &backups, &backup_count);
 	}
 
-	return true;
+	// request_filter is negative send all device configs.
+	else {
+		for (pb_size_t i = 0; i < board->devices_count; i++) {
+			save_and_mask_passwords(&board->devices[i], &backups, &backup_count);
+		}
+
+		response.response_type.capabilities.board = board;	// Use state object	
+	}
+
+	bool result = pb_encode_ex(ostream, protocol_Response_fields, &response, PB_ENCODE_DELIMITED);
+
+	// Restore the original passwords
+	for (size_t i = 0; i < backup_count; i++) {
+		backups[i].option->value.password_type.current_value = backups[i].original_password;
+	}
+
+	pmem_free(backups);
+
+	return result;
 }
 
 // return true to keep the connection open, false to close
@@ -170,6 +216,12 @@ static bool protocol_process_config_request(
 	     case protocol_OptionValue_blob_value_tag:
 			status = protocol_set_option_blob(protocol, device_id, option_id, option->value.blob_value);
 			break;
+		 case protocol_OptionValue_string_value_tag:
+			 status = protocol_set_option_string(protocol, device_id, option_id, option->value.string_value);
+			 break;
+		 case protocol_OptionValue_password_value_tag:
+			 status = protocol_set_option_password(protocol, device_id, option_id, option->value.password_value);
+			 break;
 		}
 
 		// Abort on error, but keep the connection open, unless failed to send the error
@@ -220,6 +272,14 @@ static bool protocol_process_config_request(
 			target->which_value = protocol_OptionValue_blob_value_tag;
 			target->value.blob_value = source->value.blob_type.current_value;
 			break;
+		case protocol_Option_string_type_tag:
+			target->which_value = protocol_OptionValue_string_value_tag;
+			target->value.string_value = source->value.string_type.current_value;
+			break;
+		case protocol_Option_password_type_tag:
+			target->which_value = protocol_OptionValue_password_value_tag;
+			target->value.password_value = "(hidden)";
+			break;
 		}
 	}
 	response_msg->streams_count = device->streams_count;
@@ -251,11 +311,18 @@ static bool protocol_process_start_request(
 		return protocol_send_error_code(PROTOCOL_STATUS_NO_SUCH_DEVICE, ostream);
 
 	device_manager_t* manager = &protocol->device_managers[device_id];
+	if (manager->busy != NULL && manager->busy != ostream)
+		return protocol_send_error_code(PROTOCOL_STATUS_DEVICE_BUSY, ostream);
+
 	protocol_device_start_fn start_fn = manager->start;
 	protocol_DeviceStatus status = board->devices[device_id].status;
-	if (start_fn != NULL
-		&& (status == protocol_DeviceStatus_DEVICE_STATUS_READY || status == protocol_DeviceStatus_DEVICE_STATUS_ERROR)) {
-		start_fn(protocol, device_id, ostream, manager->arg);
+	if (status == protocol_DeviceStatus_DEVICE_STATUS_READY || status == protocol_DeviceStatus_DEVICE_STATUS_ERROR) {
+		manager->busy = ostream;
+		if (start_fn != NULL)
+			start_fn(protocol, device_id, ostream, manager->arg);	
+	}
+	else if (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT) {
+		return protocol_send_error_code(PROTOCOL_STATUS_DEVICE_ALREADY_ACTIVE, ostream);
 	}
 
 	return true;
@@ -280,12 +347,18 @@ static bool protocol_process_stop_request(
 
 	if (device_id >= 0) {
 		device_manager_t* manager = &protocol->device_managers[device_id];
+		
+		// Comment out this if it should be possible stop streams from other connections
+		if (manager->busy != NULL && manager->busy != ostream)
+			return protocol_send_error_code(PROTOCOL_STATUS_DEVICE_BUSY, ostream);
+	
 		protocol_device_stop_fn stop_fn = protocol->device_managers[device_id].stop;
 		protocol_DeviceStatus status = board->devices[device_id].status;
 		if (stop_fn != NULL 
 			&& (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT)) {
 			stop_fn(protocol, device_id, ostream, manager->arg);
 		}
+		manager->busy = NULL;
 	}
 	else {
 		for (int i = 0; i < protocol->board.devices_count; i++) {
@@ -296,6 +369,7 @@ static bool protocol_process_stop_request(
 				&& (status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE || status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE_WAIT)) {
 				stop_fn(protocol, i, ostream, manager->arg);
 			}
+			manager->busy = NULL;
 		}
 	}
 
@@ -437,7 +511,7 @@ protocol_t* protocol_create(
 	const uint8_t* serial,
 	protocol_Version firmware_version)
 {
-	protocol_t* protocol = pmem_alloc_protocol();
+	protocol_t* protocol = (protocol_t*)pmem_malloc(sizeof(protocol_t));
 	if (protocol == NULL)
 		return NULL;
 	protocol->device_managers = NULL;
@@ -479,21 +553,29 @@ void protocol_delete(protocol_t* protocol)
 			for (int j = 0; j < device->options_count; j++) {
 				protocol_Option* option = &device->options[j];
 				if (option->which_value == protocol_Option_oneof_type_tag) {
-					pmem_free_plist(option->value.oneof_type.items);
+					pmem_free(option->value.oneof_type.items);
 				} else if (option->which_value == protocol_Option_blob_type_tag) {
 					if(option->value.blob_type.current_value != NULL)
-					    pmem_free_blob(option->value.blob_type.current_value);
+					    pmem_free(option->value.blob_type.current_value);
 					if (option->value.blob_type.default_value != NULL)
-					    pmem_free_blob(option->value.blob_type.default_value);
+					    pmem_free(option->value.blob_type.default_value);
+				} else if (option->which_value == protocol_Option_string_type_tag) {
+					if (option->value.string_type.current_value != NULL)
+						pmem_free(option->value.string_type.current_value);
+					if (option->value.string_type.default_value != NULL)
+						pmem_free(option->value.string_type.default_value);
+				} else if (option->which_value == protocol_Option_password_type_tag) {
+					if (option->value.password_type.current_value != NULL)
+						pmem_free(option->value.password_type.current_value);
 				}
 			}
-			pmem_free_Option(device->options);
+			pmem_free(device->options);
 		}
-		pmem_free_Device(board->devices);
+		pmem_free(board->devices);
 	}
 
-	pmem_free_device_manager(protocol->device_managers);
-	pmem_free_protocol(protocol);
+	pmem_free(protocol->device_managers);
+	pmem_free(protocol);
 }
 
 int protocol_add_device(
@@ -509,7 +591,7 @@ int protocol_add_device(
 	protocol_Board* board = &protocol->board;
 	int deviceIndex = board->devices_count++;
 
-	board->devices = pmem_realloc_Device(board->devices, board->devices_count);
+	board->devices = (protocol_Device*)pmem_realloc(board->devices, sizeof(protocol_Device) * board->devices_count);
 	if (board->devices == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
 	protocol_Device* device = &board->devices[deviceIndex];
@@ -524,9 +606,11 @@ int protocol_add_device(
 	device->status = protocol_DeviceStatus_DEVICE_STATUS_READY;
 	device->status_message = NULL;
 	
-	protocol->device_managers = pmem_realloc_device_manager(protocol->device_managers, board->devices_count);
+	protocol->device_managers = (device_manager_t*)pmem_realloc(protocol->device_managers, sizeof(device_manager_t) * board->devices_count);
 	if (protocol->device_managers == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
+
+	device_manager.busy = NULL;
 	protocol->device_managers[deviceIndex] = device_manager;
 
 	return deviceIndex;
@@ -781,7 +865,7 @@ int protocol_add_option_oneof(
 	option->value.oneof_type.default_index = default_index;
 	option->value.oneof_type.current_index = default_index;
 	option->value.oneof_type.items_count = item_count;
-	option->value.oneof_type.items = pmem_alloc_plist(item_count);
+	option->value.oneof_type.items = (char**)pmem_malloc(sizeof(char*) * item_count);
 
 	if (option->value.oneof_type.items == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
@@ -856,8 +940,20 @@ int protocol_add_option_blob(
 		return PROTOCOL_STATUS_MEMORY_ERROR;
 
 	option->which_value = protocol_Option_blob_type_tag;
-	option->value.blob_type.default_value = default_value;
-	option->value.blob_type.current_value = default_value;
+
+	if (default_value == NULL) {
+		option->value.blob_type.default_value = NULL;
+		option->value.blob_type.current_value = NULL;
+	}
+	else {
+		pb_bytes_array_t* default_copy = (pb_bytes_array_t*)pmem_malloc(PB_BYTES_ARRAY_T_ALLOCSIZE(default_value->size));
+		memcpy(default_copy, default_value, PB_BYTES_ARRAY_T_ALLOCSIZE(default_value->size));
+		option->value.blob_type.default_value = default_value;
+
+		pb_bytes_array_t* current_copy = (pb_bytes_array_t*)pmem_malloc(PB_BYTES_ARRAY_T_ALLOCSIZE(default_value->size));
+		memcpy(current_copy, default_value, PB_BYTES_ARRAY_T_ALLOCSIZE(default_value->size));
+		option->value.blob_type.current_value = current_copy;
+	}
 
 	return PROTOCOL_STATUS_SUCCESS;
 }
@@ -877,14 +973,14 @@ int protocol_set_option_blob(
 		return PROTOCOL_STATUS_INVALID_OPTION_TYPE;
 
 	if (option->value.blob_type.current_value != NULL) {
-		pmem_free_blob(option->value.blob_type.current_value);
+		pmem_free(option->value.blob_type.current_value);
 	}
 
 	if (value == NULL) {
 		option->value.blob_type.current_value = NULL;
 	}
 	else {
-		pb_bytes_array_t* copy = pmem_alloc_blob(value->size);
+		pb_bytes_array_t* copy = (pb_bytes_array_t*)pmem_malloc(PB_BYTES_ARRAY_T_ALLOCSIZE(value->size));
 		memcpy(copy, value, PB_BYTES_ARRAY_T_ALLOCSIZE(value->size));
 		option->value.blob_type.current_value = copy;
 	}
@@ -911,6 +1007,173 @@ int protocol_get_option_blob(
 	return PROTOCOL_STATUS_SUCCESS;
 }
 
+int protocol_add_option_string(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	const char* name,
+	const char* description,
+	char* default_value)
+{
+	if (protocol == NULL || name == NULL)
+		return PROTOCOL_STATUS_NULL_ARGUMENT;
+
+	protocol_Board* board = &protocol->board;
+
+	if (device_id < 0 || device_id >= board->devices_count)
+		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
+
+	protocol_Device* device = &board->devices[device_id];
+	protocol_Option* option = protocol_create_option(device, option_id, name, description);
+	if (option == NULL)
+		return PROTOCOL_STATUS_MEMORY_ERROR;
+
+	option->which_value = protocol_Option_string_type_tag;
+
+	if (default_value == NULL) {
+		option->value.string_type.default_value = NULL;
+		option->value.string_type.current_value = NULL;
+	}
+	else {
+		int len = strlen(default_value) + 1;
+		char* default_copy = (char*)pmem_malloc(len);
+		memcpy(default_copy, default_value, len);
+		option->value.string_type.default_value = default_value;
+
+		char* current_copy = (char*)pmem_malloc(len);
+		memcpy(current_copy, default_value, len);
+		option->value.string_type.current_value = current_copy;
+	}
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
+int protocol_set_option_string(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	char* value)
+{
+	protocol_Option* option;
+	int status = protocol_find_option(protocol, device_id, option_id, &option);
+	if (status != PROTOCOL_STATUS_SUCCESS)
+		return status;
+
+	if (option->which_value != protocol_Option_string_type_tag)
+		return PROTOCOL_STATUS_INVALID_OPTION_TYPE;
+
+	if (option->value.string_type.current_value != NULL) {
+		pmem_free(option->value.string_type.current_value);
+	}
+
+	if (value == NULL) {
+		option->value.string_type.current_value = NULL;
+	}
+	else {
+		int len = strlen(value) + 1;
+		char* copy = (char*)pmem_malloc(len);
+		memcpy(copy, value, len);
+		option->value.string_type.current_value = copy;
+	}
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
+int protocol_get_option_string(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	char** value)
+{
+	protocol_Option* option;
+	int status = protocol_find_option(protocol, device_id, option_id, &option);
+	if (status != PROTOCOL_STATUS_SUCCESS)
+		return status;
+
+	if (option->which_value != protocol_Option_string_type_tag)
+		return PROTOCOL_STATUS_INVALID_OPTION_TYPE;
+
+	*value = option->value.string_type.current_value;
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
+int protocol_add_option_password(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	const char* name,
+	const char* description)
+{
+	if (protocol == NULL || name == NULL)
+		return PROTOCOL_STATUS_NULL_ARGUMENT;
+
+	protocol_Board* board = &protocol->board;
+
+	if (device_id < 0 || device_id >= board->devices_count)
+		return PROTOCOL_STATUS_NO_SUCH_DEVICE;
+
+	protocol_Device* device = &board->devices[device_id];
+	protocol_Option* option = protocol_create_option(device, option_id, name, description);
+	if (option == NULL)
+		return PROTOCOL_STATUS_MEMORY_ERROR;
+
+	option->which_value = protocol_Option_password_type_tag;
+	option->value.password_type.current_value = NULL;
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
+int protocol_set_option_password(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	char* value)
+{
+	protocol_Option* option;
+	int status = protocol_find_option(protocol, device_id, option_id, &option);
+	if (status != PROTOCOL_STATUS_SUCCESS)
+		return status;
+
+	if (option->which_value != protocol_Option_password_type_tag)
+		return PROTOCOL_STATUS_INVALID_OPTION_TYPE;
+
+	if (option->value.password_type.current_value != NULL) {
+		pmem_free(option->value.password_type.current_value);
+	}
+
+	if (value == NULL) {
+		option->value.password_type.current_value = NULL;
+	}
+	else {
+		int len = strlen(value) + 1;
+		char* copy = (char*)pmem_malloc(len);
+		memcpy(copy, value, len);
+		option->value.password_type.current_value = copy;
+	}
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
+int protocol_get_option_password(
+	protocol_t* protocol,
+	int device_id,
+	int option_id,
+	char** value)
+{
+	protocol_Option* option;
+	int status = protocol_find_option(protocol, device_id, option_id, &option);
+	if (status != PROTOCOL_STATUS_SUCCESS)
+		return status;
+
+	if (option->which_value != protocol_Option_password_type_tag)
+		return PROTOCOL_STATUS_INVALID_OPTION_TYPE;
+
+	*value = option->value.password_type.current_value;
+
+	return PROTOCOL_STATUS_SUCCESS;
+}
+
 int protocol_clear_streams(protocol_t* protocol, int device_id) 
 {
 	if (protocol == NULL)
@@ -929,11 +1192,11 @@ int protocol_clear_streams(protocol_t* protocol, int device_id)
 			protocol_Dimension* dimension = &stream->shape[j];
 			char** labels = dimension->labels;
 			if (labels != NULL)
-				pmem_free_plist(labels);
+				pmem_free(labels);
 		}
 	}
 
-	pmem_free_StreamConfig(device->streams);
+	pmem_free(device->streams);
 	device->streams = NULL;
 	device->streams_count = 0;
 
@@ -961,7 +1224,7 @@ int protocol_add_stream(
 	protocol_Device* device = &board->devices[device_id];
 
 	int stream_id = device->streams_count++;
-	device->streams = pmem_realloc_StreamConfig(device->streams, device->streams_count);
+	device->streams = (protocol_StreamConfig*)pmem_realloc(device->streams, sizeof(protocol_StreamConfig) * device->streams_count);
 	if (device->streams == NULL)
 		return PROTOCOL_STATUS_MEMORY_ERROR;
 	protocol_StreamConfig* stream = &device->streams[stream_id];
@@ -1044,7 +1307,7 @@ int protocol_add_stream_rank(
 
 	if (labels != NULL) {
 		dim->labels_count = size;
-		dim->labels = pmem_alloc_plist(size);
+		dim->labels = (char**)pmem_malloc(sizeof(char*) * size);
 		if (dim->labels == NULL)
 			return PROTOCOL_STATUS_MEMORY_ERROR;
 		for (int i = 0; i < size; i++) {
@@ -1080,6 +1343,9 @@ int protocol_set_device_status(
 			device->streams[i].frames_dropped = 0;
 		}
 	}
+
+	if (status == protocol_DeviceStatus_DEVICE_STATUS_READY || status == protocol_DeviceStatus_DEVICE_STATUS_ERROR)
+		protocol->device_managers[device_id].busy = NULL;
 
 	device->status = status;
 	device->status_message = (char*)message;
@@ -1152,6 +1418,10 @@ void protocol_call_device_poll(
 {
 	for (int i = 0; i < protocol->board.devices_count; i++) {
 		device_manager_t* manager = &protocol->device_managers[i];
+		
+		if (manager->busy != ostream)
+			continue;
+
 		protocol_device_poll_fn poll = manager->poll;
 		if (poll != NULL && protocol->board.devices[i].status == protocol_DeviceStatus_DEVICE_STATUS_ACTIVE)
 			poll(protocol, i, ostream, manager->arg);
@@ -1318,6 +1588,8 @@ const char* protocol_get_error_msg(int error)
 	case PROTOCOL_STATUS_FRAME_COUNT_EXCEEDED: return "Frame count exceeded.";
 	case PROTOCOL_STATUS_INVALID_FRAME_SIZE: return "Invalid frame size.";
 	case PROTOCOL_STATUS_MEMORY_ERROR: return "Memory allocation error.";
+	case PROTOCOL_STATUS_DEVICE_ALREADY_ACTIVE: return "Device already active.";
+	case PROTOCOL_STATUS_DEVICE_BUSY: return "Device busy with another stream.";
 	default:
 		return "Unknown error.";
 	}

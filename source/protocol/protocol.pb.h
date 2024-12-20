@@ -39,6 +39,8 @@ typedef struct _protocol_OptionValue {
         bool bool_value; /* Boolean value */
         int32_t oneof_value; /* Index into OptionOneOf items */
         pb_bytes_array_t *blob_value; /* Blob value */
+        char *string_value; /* String value */
+        char *password_value; /* String value (hidden) */
     } value;
 } protocol_OptionValue;
 
@@ -216,6 +218,8 @@ extern "C" {
 #define protocol_OptionValue_bool_value_tag      4
 #define protocol_OptionValue_oneof_value_tag     5
 #define protocol_OptionValue_blob_value_tag      6
+#define protocol_OptionValue_string_value_tag    7
+#define protocol_OptionValue_password_value_tag  8
 #define protocol_DeviceConfigurationRequest_device_tag 1
 #define protocol_DeviceConfigurationRequest_options_tag 2
 #define protocol_DeviceConfigurationRequest_tag_tag 3
@@ -305,7 +309,9 @@ X(a, STATIC,   ONEOF,    INT32,    (value,int_value,value.int_value),   2) \
 X(a, STATIC,   ONEOF,    FLOAT,    (value,float_value,value.float_value),   3) \
 X(a, STATIC,   ONEOF,    BOOL,     (value,bool_value,value.bool_value),   4) \
 X(a, STATIC,   ONEOF,    INT32,    (value,oneof_value,value.oneof_value),   5) \
-X(a, POINTER,  ONEOF,    BYTES,    (value,blob_value,value.blob_value),   6)
+X(a, POINTER,  ONEOF,    BYTES,    (value,blob_value,value.blob_value),   6) \
+X(a, POINTER,  ONEOF,    STRING,   (value,string_value,value.string_value),   7) \
+X(a, POINTER,  ONEOF,    STRING,   (value,password_value,value.password_value),   8)
 #define protocol_OptionValue_CALLBACK NULL
 #define protocol_OptionValue_DEFAULT NULL
 

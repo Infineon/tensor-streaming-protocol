@@ -207,6 +207,15 @@ typedef struct _protocol_OptionBlob {
     pb_bytes_array_t *default_value;
 } protocol_OptionBlob;
 
+typedef struct _protocol_OptionString {
+    char *current_value;
+    char *default_value;
+} protocol_OptionString;
+
+typedef struct _protocol_OptionPassword {
+    char *current_value;
+} protocol_OptionPassword;
+
 /* Structure for device a option */
 typedef struct _protocol_Option {
     /* Unique ID for the option. */
@@ -222,6 +231,8 @@ typedef struct _protocol_Option {
         protocol_OptionBool bool_type; /* Checkbox */
         protocol_OptionOneOf oneof_type; /* Dropdown list option */
         protocol_OptionBlob blob_type; /* Binary object option */
+        protocol_OptionString string_type; /* String field */
+        protocol_OptionPassword password_type; /* String field (hidden) */
     } value;
 } protocol_Option;
 
@@ -264,6 +275,8 @@ extern "C" {
 
 
 
+
+
 /* Initializer values for message structs */
 #define protocol_Version_init_default            {0, 0, 0, 0}
 #define protocol_BoardSerial_init_default        {{0}}
@@ -277,6 +290,8 @@ extern "C" {
 #define protocol_OptionBool_init_default         {0, 0}
 #define protocol_OptionOneOf_init_default        {0, 0, 0, NULL}
 #define protocol_OptionBlob_init_default         {NULL, NULL}
+#define protocol_OptionString_init_default       {NULL, NULL}
+#define protocol_OptionPassword_init_default     {NULL}
 #define protocol_Version_init_zero               {0, 0, 0, 0}
 #define protocol_BoardSerial_init_zero           {{0}}
 #define protocol_Board_init_zero                 {protocol_BoardSerial_init_zero, NULL, protocol_Version_init_zero, protocol_Version_init_zero, 0, 0, NULL}
@@ -289,6 +304,8 @@ extern "C" {
 #define protocol_OptionBool_init_zero            {0, 0}
 #define protocol_OptionOneOf_init_zero           {0, 0, 0, NULL}
 #define protocol_OptionBlob_init_zero            {NULL, NULL}
+#define protocol_OptionString_init_zero          {NULL, NULL}
+#define protocol_OptionPassword_init_zero        {NULL}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define protocol_Version_major_tag               1
@@ -340,6 +357,9 @@ extern "C" {
 #define protocol_OptionOneOf_items_tag           3
 #define protocol_OptionBlob_current_value_tag    1
 #define protocol_OptionBlob_default_value_tag    2
+#define protocol_OptionString_current_value_tag  1
+#define protocol_OptionString_default_value_tag  2
+#define protocol_OptionPassword_current_value_tag 1
 #define protocol_Option_option_id_tag            1
 #define protocol_Option_name_tag                 2
 #define protocol_Option_description_tag          3
@@ -348,6 +368,8 @@ extern "C" {
 #define protocol_Option_bool_type_tag            6
 #define protocol_Option_oneof_type_tag           7
 #define protocol_Option_blob_type_tag            8
+#define protocol_Option_string_type_tag          9
+#define protocol_Option_password_type_tag        10
 
 /* Struct field encoding specification for nanopb */
 #define protocol_Version_FIELDLIST(X, a) \
@@ -399,7 +421,9 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (value,int_type,value.int_type),   4) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (value,float_type,value.float_type),   5) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (value,bool_type,value.bool_type),   6) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (value,oneof_type,value.oneof_type),   7) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (value,blob_type,value.blob_type),   8)
+X(a, STATIC,   ONEOF,    MESSAGE,  (value,blob_type,value.blob_type),   8) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (value,string_type,value.string_type),   9) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (value,password_type,value.password_type),  10)
 #define protocol_Option_CALLBACK NULL
 #define protocol_Option_DEFAULT NULL
 #define protocol_Option_value_int_type_MSGTYPE protocol_OptionInt
@@ -407,6 +431,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (value,blob_type,value.blob_type),   8)
 #define protocol_Option_value_bool_type_MSGTYPE protocol_OptionBool
 #define protocol_Option_value_oneof_type_MSGTYPE protocol_OptionOneOf
 #define protocol_Option_value_blob_type_MSGTYPE protocol_OptionBlob
+#define protocol_Option_value_string_type_MSGTYPE protocol_OptionString
+#define protocol_Option_value_password_type_MSGTYPE protocol_OptionPassword
 
 #define protocol_StreamConfig_FIELDLIST(X, a) \
 X(a, POINTER,  SINGULAR, STRING,   name,              1) \
@@ -467,6 +493,17 @@ X(a, POINTER,  SINGULAR, BYTES,    default_value,     2)
 #define protocol_OptionBlob_CALLBACK NULL
 #define protocol_OptionBlob_DEFAULT NULL
 
+#define protocol_OptionString_FIELDLIST(X, a) \
+X(a, POINTER,  SINGULAR, STRING,   current_value,     1) \
+X(a, POINTER,  SINGULAR, STRING,   default_value,     2)
+#define protocol_OptionString_CALLBACK NULL
+#define protocol_OptionString_DEFAULT NULL
+
+#define protocol_OptionPassword_FIELDLIST(X, a) \
+X(a, POINTER,  SINGULAR, STRING,   current_value,     1)
+#define protocol_OptionPassword_CALLBACK NULL
+#define protocol_OptionPassword_DEFAULT NULL
+
 extern const pb_msgdesc_t protocol_Version_msg;
 extern const pb_msgdesc_t protocol_BoardSerial_msg;
 extern const pb_msgdesc_t protocol_Board_msg;
@@ -479,6 +516,8 @@ extern const pb_msgdesc_t protocol_OptionFloat_msg;
 extern const pb_msgdesc_t protocol_OptionBool_msg;
 extern const pb_msgdesc_t protocol_OptionOneOf_msg;
 extern const pb_msgdesc_t protocol_OptionBlob_msg;
+extern const pb_msgdesc_t protocol_OptionString_msg;
+extern const pb_msgdesc_t protocol_OptionPassword_msg;
 
 /* Defines for backwards compatibility with code written before nanopb-0.4.0 */
 #define protocol_Version_fields &protocol_Version_msg
@@ -493,6 +532,8 @@ extern const pb_msgdesc_t protocol_OptionBlob_msg;
 #define protocol_OptionBool_fields &protocol_OptionBool_msg
 #define protocol_OptionOneOf_fields &protocol_OptionOneOf_msg
 #define protocol_OptionBlob_fields &protocol_OptionBlob_msg
+#define protocol_OptionString_fields &protocol_OptionString_msg
+#define protocol_OptionPassword_fields &protocol_OptionPassword_msg
 
 /* Maximum encoded size of messages (where known) */
 /* protocol_Board_size depends on runtime parameters */
@@ -502,6 +543,8 @@ extern const pb_msgdesc_t protocol_OptionBlob_msg;
 /* protocol_Dimension_size depends on runtime parameters */
 /* protocol_OptionOneOf_size depends on runtime parameters */
 /* protocol_OptionBlob_size depends on runtime parameters */
+/* protocol_OptionString_size depends on runtime parameters */
+/* protocol_OptionPassword_size depends on runtime parameters */
 #define PROTOCOL_MODEL_PB_H_MAX_SIZE             protocol_OptionInt_size
 #define protocol_BoardSerial_size                18
 #define protocol_OptionBool_size                 4

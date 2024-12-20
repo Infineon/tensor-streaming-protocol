@@ -34,3 +34,10 @@ protocol.OptionOneOf.items type:FT_POINTER type:FT_POINTER
 # OptionBlob
 protocol.OptionBlob.current_value type:FT_POINTER
 protocol.OptionBlob.default_value type:FT_POINTER
+
+# OptionString
+protocol.OptionString.current_value type:FT_POINTER
+protocol.OptionString.default_value type:FT_POINTER
+
+# OptionPassword
+protocol.OptionPassword.current_value type:FT_POINTER

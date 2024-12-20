@@ -86,6 +86,8 @@ internal class StreamMeasure : StreamHandlerBase
         _currentFrameNumber = data.FrameNumber + data.FrameCount;
         _totalDropped += dropped;
         
+       
+
         var converted = ToDoubles(data.Payload.Span);
 
         _framesLeft -= dropped;

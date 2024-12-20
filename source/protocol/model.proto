@@ -114,11 +114,13 @@ message Option {
     string description = 3;
 	
     oneof value {
-        OptionInt int_type = 4;         // Integer text field
-	    OptionFloat float_type = 5;     // Float text field
-        OptionBool bool_type = 6;       // Checkbox
-        OptionOneOf oneof_type = 7;     // Dropdown list option
-        OptionBlob blob_type = 8;       // Binary object option
+        OptionInt int_type = 4;            // Integer text field
+	    OptionFloat float_type = 5;        // Float text field
+        OptionBool bool_type = 6;          // Checkbox
+        OptionOneOf oneof_type = 7;        // Dropdown list option
+        OptionBlob blob_type = 8;          // Binary object option
+        OptionString string_type = 9;      // String field
+        OptionPassword password_type = 10; // String field (hidden)
     };
 }
 
@@ -217,6 +219,15 @@ message OptionOneOf {
 message OptionBlob {
     bytes current_value = 1;
     bytes default_value = 2;
+}
+
+message OptionString {
+    string current_value = 1;
+    string default_value = 2;
+}
+
+message OptionPassword {
+    string current_value = 1;
 }
 
 enum StreamDirection {

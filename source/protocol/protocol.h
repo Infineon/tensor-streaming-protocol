@@ -46,8 +46,8 @@ extern "C" {
 #define PROTOCOL_VERSION \
 (protocol_Version) {     \
     major: 2,            \
-    minor: 2,            \
-    build: 20241213,     \
+    minor: 3,            \
+    build: 20241218,     \
     revision: 0          \
 }
 
@@ -75,6 +75,9 @@ extern "C" {
 #define PROTOCOL_STATUS_FRAME_COUNT_EXCEEDED      (-17) // Frame count exceeded
 #define PROTOCOL_STATUS_INVALID_FRAME_SIZE        (-18) // Invalid frame size
 #define PROTOCOL_STATUS_MEMORY_ERROR              (-19) // Memory allocation failed
+#define PROTOCOL_STATUS_DEVICE_ALREADY_ACTIVE     (-20) // Device already active
+#define PROTOCOL_STATUS_DEVICE_BUSY               (-21) // Device busy with another stream
+
 
 /******************************************************************************
  *                                   Types                                    *
@@ -136,6 +139,11 @@ typedef struct {
     * User defined argument passed to all callback functions. 
     */
     void* arg;
+
+    /*
+    * If set the device is busy with this stream.    
+    */
+    pb_ostream_t* busy;
 
     /*
     * Callback that is invoked every time a DeviceConfigurationRequest is received.
@@ -491,6 +499,93 @@ int protocol_set_option_blob(protocol_t* protocol, int device_id, int option_id,
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_get_option_blob(protocol_t* protocol, int device_id, int option_id, pb_bytes_array_t** value);
+
+/**
+ * Register a new string option to a device.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param name: The name of the option.
+ * @param description: The description of the option.
+ * @param default_value: The default value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_add_option_string(
+    protocol_t* protocol,
+    int device_id,
+    int option_id,
+    const char* name,
+    const char* description,
+    char* default_value);
+
+/**
+ * Update an existing string option value.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param value: The new value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_set_option_string(protocol_t* protocol, int device_id, int option_id, char* value);
+
+/**
+ * Read a string option value.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param value: The current value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_get_option_string(protocol_t* protocol, int device_id, int option_id, char** value);
+
+/**
+ * Register a new hidden password string option to a device.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param name: The name of the option.
+ * @param description: The description of the option.
+ * @param default_value: The default value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_add_option_password(
+    protocol_t* protocol,
+    int device_id,
+    int option_id,
+    const char* name,
+    const char* description);
+
+/**
+ * Update an existing hidden password string option value.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param value: The new value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_set_option_password(protocol_t* protocol, int device_id, int option_id, char* value);
+
+/**
+ * Read a hidden password string option value.
+ *
+ * @param protocol: The protocol_t object.
+ * @param device_id: The ID of the device.
+ * @param option_id: The ID of the option.
+ * @param value: The current value of the option.
+ *
+ * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
+ */
+int protocol_get_option_password(protocol_t* protocol, int device_id, int option_id, char** value);
 
 /**
  * Clear any registered streams for a given device.
