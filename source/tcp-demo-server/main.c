@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #ifdef _WIN32
 #include <winsock2.h>
-#include <ws2tcpip.h>
 #include <windows.h>
 #pragma comment(lib, "ws2_32.lib")
 typedef int socklen_t; /* Define socklen_t for Windows */
@@ -15,16 +15,19 @@ typedef int socklen_t; /* Define socklen_t for Windows */
 #include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <netdb.h>
 #endif
+
 #include <pb_decode.h>
 #include <pb_encode.h>
 #include <protocol.h>
 
+#include "announcement.h"
 #include "devices/camera/camera.h"
 #include "devices/mic/mic.h"
 #include "devices/model/model.h"
 
-#define TCP_PORT 12345
+#define TCP_PORT 14325
 
 // Buffer size for reading data from the socket
 #define BUFFER_SIZE 4096
@@ -223,7 +226,7 @@ static void start_server(protocol_t* protocol, int port) {
         exit(EXIT_FAILURE);
     }
 
-    printf("Server listening on port %d\n", port);
+    printf("Server listening on TCP port %d\n", port);
 
     while (1) {
         // Accept a new client connection
@@ -273,7 +276,7 @@ static void start_server(protocol_t* protocol, int port) {
 
     // Close the server socket
     close(server_socket);
- }
+}
 
 int main() {
 #ifdef _WIN32
@@ -298,6 +301,12 @@ int main() {
 
     // Create the protocol instance
     protocol_t* protocol = protocol_create("Demo Board", serial, firmware_version);
+
+    // Start the announcement functionality
+    if (announcement_start(protocol, TCP_PORT) != 0) {
+        fprintf(stderr, "Failed to start discovery functionality\n");
+        exit(EXIT_FAILURE);
+    }
 
     // Register devices with the protocol
     camera_register(protocol);

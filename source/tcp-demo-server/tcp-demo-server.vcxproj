@@ -34,6 +34,7 @@
     <ClCompile Include="devices\mic\mic.c" />
     <ClCompile Include="devices\model\keyword_spotter.c" />
     <ClCompile Include="devices\model\model.c" />
+    <ClCompile Include="announcement.c" />
     <ClCompile Include="main.c" />
   </ItemGroup>
   <ItemGroup>
@@ -46,6 +47,7 @@
     <ClInclude Include="devices\mic\mic.h" />
     <ClInclude Include="devices\model\keyword_spotter.h" />
     <ClInclude Include="devices\model\model.h" />
+    <ClInclude Include="announcement.h" />
   </ItemGroup>
   <ItemGroup>
     <Media Include="devices\model\test\input.wav" />

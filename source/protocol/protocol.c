@@ -1315,6 +1315,7 @@ int protocol_add_stream_rank(
 		}
 	} else {
 		dim->labels_count = 0;
+		dim->labels = NULL;
 	}
 
 	return PROTOCOL_STATUS_SUCCESS;

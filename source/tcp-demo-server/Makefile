@@ -3,8 +3,8 @@ AR = ar
 CFLAGS = -DPB_ENABLE_MALLOC -O3 -Wall -Wextra
 
 
-HEADERS += devices/camera/camera.h devices/mic/mic.h devices/model/model.h devices/model/keyword_spotter.h 
-CFILES = main.c devices/camera/camera.c devices/mic/mic.c devices/model/model.c devices/model/keyword_spotter.c
+HEADERS += devices/camera/camera.h devices/mic/mic.h devices/model/model.h devices/model/keyword_spotter.h announcement.h
+CFILES = main.c announcement.c devices/camera/camera.c devices/mic/mic.c devices/model/model.c devices/model/keyword_spotter.c
 LIBS = ../protocol/protocol.a -lm
 
 all: main
@@ -16,6 +16,7 @@ protocol:
 
 main: $(CFILES) $(HEADERS) $(LIBS) protocol
 	gcc $(CFLAGS) $(CFILES) $(LIBS) -I../protocol -o $@
+
 
 clean:
 	make clean -C ../protocol
