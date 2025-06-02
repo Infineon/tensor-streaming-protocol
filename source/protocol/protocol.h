@@ -1,10 +1,10 @@
 /*
 * The MIT License (MIT)
 *
-* Copyright © 2024- Imagimob AB
+* Copyright (c) 2024- Imagimob AB
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the “Software”), to deal
+* of this software and associated documentation files (the \"Software\"), to deal
 * in the Software without restriction, including without limitation the rights
 * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 * copies of the Software, and to permit persons to whom the Software is
@@ -13,7 +13,7 @@
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
 *
-* THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -24,8 +24,8 @@
 */
 
 /*
- * This is an API built on top of the Protocol Buffers files: model.proto and 
- * protocol.proto. For more detailed information on the data structures and 
+ * This is an API built on top of the Protocol Buffers files: model.proto and
+ * protocol.proto. For more detailed information on the data structures and
  * protocol definitions, please refer to those files.
  */
 
@@ -45,54 +45,54 @@ extern "C" {
 
 #define PROTOCOL_VERSION \
 (protocol_Version) {     \
-    major: 2,            \
-    minor: 3,            \
-    build: 20241218,     \
-    revision: 0          \
+    .major = 2,            \
+    .minor = 3,            \
+    .build = 20250602,     \
+    .revision = 0          \
 }
 
- // Handy when compiling with -Wextra (as you should :-)
+/* Handy when compiling with -Wextra (as you should :-) */
 #define UNUSED(x) (void)(x)
 
- // Return status codes
-#define PROTOCOL_STATUS_SUCCESS                   (0)   // Operation completed successfully
-#define PROTOCOL_STATUS_UNSPECIFIED_ERROR         (-1)  // An unspecified error occurred
-#define PROTOCOL_STATUS_NULL_ARGUMENT             (-2)  // Null argument provided
-#define PROTOCOL_STATUS_INVALID_OPTION_TYPE       (-3)  // Invalid option type
-#define PROTOCOL_STATUS_INVALID_REQUEST_TYPE      (-4)  // Invalid request type
-#define PROTOCOL_STATUS_INVALID_RESPONSE_TYPE     (-5)  // Invalid response type
-#define PROTOCOL_STATUS_MAX_RANK_REACHED          (-6)  // Maximum rank reached
-#define PROTOCOL_STATUS_OSTREAM_ERROR             (-7)  // Output stream error
-#define PROTOCOL_STATUS_ISTREAM_ERROR             (-8)  // Input stream error
-#define PROTOCOL_STATUS_FAILED_TO_DECODE_REQUEST  (-9)  // Failed to decode request
-#define PROTOCOL_STATUS_FAILED_TO_ENCODE_RESPONSE (-10) // Failed to encode response
-#define PROTOCOL_STATUS_NO_SUCH_OPTION            (-11) // No such option
-#define PROTOCOL_STATUS_NO_SUCH_DEVICE            (-12) // No such device
-#define PROTOCOL_STATUS_NO_SUCH_STREAM            (-13) // No such stream
-#define PROTOCOL_STATUS_VALUE_OUT_OF_RANGE        (-14) // Value out of range
-#define PROTOCOL_STATUS_DEVICE_NOT_ACTIVE         (-15) // Device not active
-#define PROTOCOL_STATUS_WRONG_STREAM_DIRECTION    (-16) // Wrong stream direction
-#define PROTOCOL_STATUS_FRAME_COUNT_EXCEEDED      (-17) // Frame count exceeded
-#define PROTOCOL_STATUS_INVALID_FRAME_SIZE        (-18) // Invalid frame size
-#define PROTOCOL_STATUS_MEMORY_ERROR              (-19) // Memory allocation failed
-#define PROTOCOL_STATUS_DEVICE_ALREADY_ACTIVE     (-20) // Device already active
-#define PROTOCOL_STATUS_DEVICE_BUSY               (-21) // Device busy with another stream
+/* Return status codes */
+#define PROTOCOL_STATUS_SUCCESS                   (0)   /* Operation completed successfully */
+#define PROTOCOL_STATUS_UNSPECIFIED_ERROR         (-1)  /* An unspecified error occurred */
+#define PROTOCOL_STATUS_NULL_ARGUMENT             (-2)  /* Null argument provided */
+#define PROTOCOL_STATUS_INVALID_OPTION_TYPE       (-3)  /* Invalid option type */
+#define PROTOCOL_STATUS_INVALID_REQUEST_TYPE      (-4)  /* Invalid request type */
+#define PROTOCOL_STATUS_INVALID_RESPONSE_TYPE     (-5)  /* Invalid response type */
+#define PROTOCOL_STATUS_MAX_RANK_REACHED          (-6)  /* Maximum rank reached */
+#define PROTOCOL_STATUS_OSTREAM_ERROR             (-7)  /* Output stream error */
+#define PROTOCOL_STATUS_ISTREAM_ERROR             (-8)  /* Input stream error */
+#define PROTOCOL_STATUS_FAILED_TO_DECODE_REQUEST  (-9)  /* Failed to decode request */
+#define PROTOCOL_STATUS_FAILED_TO_ENCODE_RESPONSE (-10) /* Failed to encode response */
+#define PROTOCOL_STATUS_NO_SUCH_OPTION            (-11) /* No such option */
+#define PROTOCOL_STATUS_NO_SUCH_DEVICE            (-12) /* No such device */
+#define PROTOCOL_STATUS_NO_SUCH_STREAM            (-13) /* No such stream */
+#define PROTOCOL_STATUS_VALUE_OUT_OF_RANGE        (-14) /* Value out of range */
+#define PROTOCOL_STATUS_DEVICE_NOT_ACTIVE         (-15) /* Device not active */
+#define PROTOCOL_STATUS_WRONG_STREAM_DIRECTION    (-16) /* Wrong stream direction */
+#define PROTOCOL_STATUS_FRAME_COUNT_EXCEEDED      (-17) /* Frame count exceeded */
+#define PROTOCOL_STATUS_INVALID_FRAME_SIZE        (-18) /* Invalid frame size */
+#define PROTOCOL_STATUS_MEMORY_ERROR              (-19) /* Memory allocation failed */
+#define PROTOCOL_STATUS_DEVICE_ALREADY_ACTIVE     (-20) /* Device already active */
+#define PROTOCOL_STATUS_DEVICE_BUSY               (-21) /* Device busy with another stream */
 
 
 /******************************************************************************
  *                                   Types                                    *
  *****************************************************************************/
 
-// Predefined. See documentation for protocol_s.
+/* Predefined. See documentation for protocol_s. */
 typedef struct protocol_s protocol_t;
 
-// Function pointer typedefs for device manager callbacks (see device_manager_t)
+/* Function pointer typedefs for device manager callbacks (see device_manager_t) */
 typedef bool (*protocol_configure_streams_fn)(protocol_t* protocol, int device, void* arg);
 typedef void (*protocol_device_start_fn)(protocol_t* protocol, int device, pb_ostream_t* ostream, void* arg);
 typedef void (*protocol_device_stop_fn)(protocol_t* protocol, int device, pb_ostream_t* ostream, void* arg);
 typedef void (*protocol_device_poll_fn)(protocol_t* protocol, int device, pb_ostream_t* ostream, void* arg);
 typedef bool (*protocol_data_received)(protocol_t* protocol, protocol_DataChunk *msg, pb_istream_t* istream, void* arg);
-    
+
 typedef void (*protocol_watchdog_reset_fn)(protocol_t* protocol);
 typedef void (*protocol_board_reset_fn)(protocol_t* protocol);
 
@@ -136,12 +136,12 @@ typedef bool (*protocol_write_payload_fn)(
 
 typedef struct {
     /*
-    * User defined argument passed to all callback functions. 
+    * User defined argument passed to all callback functions.
     */
     void* arg;
 
     /*
-    * If set the device is busy with this stream.    
+    * If set the device is busy with this stream.
     */
     pb_ostream_t* busy;
 
@@ -150,10 +150,10 @@ typedef struct {
     * It should update the protocol->board->devices[device]->stream[] objects.
     * It can be done using helper functions e.g. protocol_clear_streams(),
     * protocol_add_stream(), protocol_add_stream_rank().
-    * 
-    * The method should call protocol_set_device_status(status, msg) to update the 
-    * status indicating if the device is ready or have an invalid mix of settings. 
-    * 
+    *
+    * The method should call protocol_set_device_status(status, msg) to update the
+    * status indicating if the device is ready or have an invalid mix of settings.
+    *
     * May be NULL for devices that do not need to reconfigure their streams or
     * need to validate any options.
     */
@@ -161,7 +161,7 @@ typedef struct {
 
     /*
     * Callback that is invoked when the device received a start request.
-    * This function should initialize/start the device and call 
+    * This function should initialize/start the device and call
     * protocol_set_device_status(protocol_DeviceStatus_Active).
     * An device in Active state is sending and accepting DataChunk messages.
     */
@@ -174,9 +174,9 @@ typedef struct {
     protocol_device_stop_fn stop;
 
     /*
-    * When protocol_call_device_poll() is called, each device that is in the 
+    * When protocol_call_device_poll() is called, each device that is in the
     * Active state gets its poll callback invoked.
-    * This function should call protocol_send_data_chunk() if it have any data to send. 
+    * This function should call protocol_send_data_chunk() if it have any data to send.
     */
     protocol_device_poll_fn poll;
 
@@ -191,8 +191,8 @@ typedef struct {
 * This is the main structure for the protocol implementation.
 */
 typedef struct protocol_s {
-    /* 
-    * The current board state. 
+    /*
+    * The current board state.
     */
     protocol_Board board;
 
@@ -200,8 +200,8 @@ typedef struct protocol_s {
     * Collection of callback functions to manage device events.
     * Array of length board->devices_count
     */
-    device_manager_t* device_managers;  
-    
+    device_manager_t* device_managers;
+
     /*
     * Called when a WatchdogResetRequest message is received.
     */
@@ -223,11 +223,11 @@ typedef struct protocol_s {
   * @param board_name: The name of the board.
   * @param serial_uuid: 16 bytes serial number UUID. Used by host software to uniquely identify a device.
   * @param firmware_version: The version of the firmware.
-  * 
+  *
   * @return A pointer to the newly created protocol_t object, or NULL on failure.
   */
 protocol_t* protocol_create(
-    const char* board_name, 
+    const char* board_name,
     const uint8_t* serial_uuid,
     protocol_Version firmware_version);
 
@@ -258,12 +258,12 @@ void protocol_configure_watchdog(
  * @param name: The name of the device.
  * @param description: The description of the device.
  * @param device_manager: The device manager callback functions.
- * 
+ *
  * @return The new device_id (index) or a negative value on error.
  */
 int protocol_add_device(
-    protocol_t* protocol, 
-    protocol_DeviceType type, 
+    protocol_t* protocol,
+    protocol_DeviceType type,
     const char* name,
     const char* description,
     device_manager_t device_manager);
@@ -279,17 +279,17 @@ int protocol_add_device(
  * @param default_value: The default value of the option.
  * @param min_value: The minimum value of the option.
  * @param max_value: The maximum value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_add_option_int(
     protocol_t* protocol,
-    int device_id, 
+    int device_id,
     int option_id,
     const char* name,
-    const char* description, 
-    int default_value, 
-    int min_value, 
+    const char* description,
+    int default_value,
+    int min_value,
     int max_value);
 
 /**
@@ -299,7 +299,7 @@ int protocol_add_option_int(
  * @param device_id: The ID of the device.
  * @param option_id: The ID of the option.
  * @param value: The new value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_set_option_int(protocol_t* protocol, int device_id, int option_id, int value);
@@ -311,7 +311,7 @@ int protocol_set_option_int(protocol_t* protocol, int device_id, int option_id, 
  * @param device_id: The ID of the device.
  * @param option_id: The ID of the option.
  * @param value: The current value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_get_option_int(protocol_t* protocol, int device_id, int option_id, int* value);
@@ -327,17 +327,17 @@ int protocol_get_option_int(protocol_t* protocol, int device_id, int option_id, 
  * @param default_value: The default value of the option.
  * @param min_value: The minimum value of the option.
  * @param max_value: The maximum value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_add_option_float(
-    protocol_t* protocol, 
-    int device_id, 
-    int option_id, 
-    const char* name, 
-    const char* description, 
-    float default_value, 
-    float min_value, 
+    protocol_t* protocol,
+    int device_id,
+    int option_id,
+    const char* name,
+    const char* description,
+    float default_value,
+    float min_value,
     float max_value);
 
 /**
@@ -347,7 +347,7 @@ int protocol_add_option_float(
  * @param device_id: The ID of the device.
  * @param option_id: The ID of the option.
  * @param value: The new value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_set_option_float(protocol_t* protocol, int device_id, int option_id, float value);
@@ -359,7 +359,7 @@ int protocol_set_option_float(protocol_t* protocol, int device_id, int option_id
  * @param device_id: The ID of the device.
  * @param option_id: The ID of the option.
  * @param value: The current value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_get_option_float(protocol_t* protocol, int device_id, int option_id, float* value);
@@ -373,15 +373,15 @@ int protocol_get_option_float(protocol_t* protocol, int device_id, int option_id
  * @param name: The name of the option.
  * @param description: The description of the option.
  * @param default_value: The default value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_add_option_bool(
     protocol_t* protocol,
     int device_id,
-    int option_id, 
-    const char* name, 
-    const char* description, 
+    int option_id,
+    const char* name,
+    const char* description,
     bool default_value);
 
 /**
@@ -391,7 +391,7 @@ int protocol_add_option_bool(
  * @param device_id: The ID of the device.
  * @param option_id: The ID of the option.
  * @param value: The new value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_set_option_bool(protocol_t* protocol, int device_id, int option_id, bool value);
@@ -403,7 +403,7 @@ int protocol_set_option_bool(protocol_t* protocol, int device_id, int option_id,
  * @param device_id: The ID of the device.
  * @param option_id: The ID of the option.
  * @param value: The current value of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_get_option_bool(protocol_t* protocol, int device_id, int option_id, bool* value);
@@ -419,16 +419,16 @@ int protocol_get_option_bool(protocol_t* protocol, int device_id, int option_id,
  * @param default_index: The default index of the option.
  * @param items: The items of the option.
  * @param item_count: The number of items.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_add_option_oneof(
-    protocol_t* protocol, 
-    int device_id, 
+    protocol_t* protocol,
+    int device_id,
     int option_id,
-    const char* name, 
-    const char* description, 
-    int default_index, 
+    const char* name,
+    const char* description,
+    int default_index,
     const char** items,
     int item_count);
 
@@ -439,7 +439,7 @@ int protocol_add_option_oneof(
  * @param device_id: The ID of the device.
  * @param option_id: The ID of the option.
  * @param index: The new index of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_set_option_oneof(protocol_t* protocol, int device_id, int option_id, int index);
@@ -451,7 +451,7 @@ int protocol_set_option_oneof(protocol_t* protocol, int device_id, int option_id
  * @param device_id: The ID of the device.
  * @param option_id: The ID of the option.
  * @param index: The current index of the option.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_get_option_oneof(protocol_t* protocol, int device_id, int option_id, int* index);
@@ -592,7 +592,7 @@ int protocol_get_option_password(protocol_t* protocol, int device_id, int option
  *
  * @param protocol: The protocol_t object.
  * @param device: The ID of the device.
- * 
+ *
  * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
  */
 int protocol_clear_streams(protocol_t* protocol, int device);
@@ -600,7 +600,7 @@ int protocol_clear_streams(protocol_t* protocol, int device);
 /**
 * Register a new stream.
 * See message StreamConfig in model.proto.
-* 
+*
 * @param protocol: A pointer to the protocol_t object.
 * @param device_id: The ID of the device.
 * @param name: The name of the stream.
@@ -608,38 +608,38 @@ int protocol_clear_streams(protocol_t* protocol, int device);
 * @param datatype: The data type of the stream.
 * @param frequency: The frequency of the stream.
 * @param max_frame_count: The maximum number of frames in each DataChunk.
-* @param unit: The unit name if available. e.g. m/s² (feel free to use unicode)
-* 
+* @param unit: The unit name if available. e.g. m/s (feel free to use unicode)
+*
 * @return The new stream_id (index) or a negative value on error.
 */
 int protocol_add_stream(
-    protocol_t* protocol, 
-    int device_id, 
-    const char* name, 
-    protocol_StreamDirection direction, 
-    protocol_DataType datatype, 
-    float frequency,              
-    int32_t max_frame_count,            
-    const char* unit);         
+    protocol_t* protocol,
+    int device_id,
+    const char* name,
+    protocol_StreamDirection direction,
+    protocol_DataType datatype,
+    float frequency,
+    int32_t max_frame_count,
+    const char* unit);
 
 /**
 * Set quantization options for stream.
-* 
-* For D types: 
+*
+* For D types:
 *   real_value = (int_value - offset) * scale
-* 
+*
 * For Q types:
 *   real_value = int8_value / (128 >> shift)
 *   real_value = int16_value / (32768 >> shift)
 *   real_value = int32_value / (2147483648 >> shift)
-* 
+*
 * @param protocol: A pointer to the protocol_t object.
 * @param device_id: The ID of the device.
 * @param stream_id: The stream ID (index) to configure.
-* @param shift: The shift for quantized data streams. Default to 0. Only used for types DATA_TYPE_Qxx. 
+* @param shift: The shift for quantized data streams. Default to 0. Only used for types DATA_TYPE_Qxx.
 * @param scale: The scale for quantized data streams. Default to 1. Only used for types DATA_TYPE_Dxx.
 * @param offset: The offset for quantized data streams. Default to 0. Only used for types DATA_TYPE_Dxx.
-* 
+*
 * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
 */
 int protocol_set_stream_quantization_options(
@@ -651,16 +651,16 @@ int protocol_set_stream_quantization_options(
     int64_t offset);
 
 /*
-* Add a tensor dimension (rank). 
+* Add a tensor dimension (rank).
 * See Dimension in file model.proto
-* 
+*
 * @param protocol: A pointer to the protocol_t object.
 * @param device_id: The ID of the device.
 * @param stream_id: The ID of the stream.
 * @param name: The name of the dimension.
 * @param size: The size of the dimension.
 * @param labels: An array of labels for the dimension.
-* 
+*
 * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
 *
 * @example:
@@ -676,28 +676,28 @@ int protocol_set_stream_quantization_options(
 * protocol_add_stream_rank(protocol, device_id, stream_id, "Color", 3, color_labels);
 */
 int protocol_add_stream_rank(
-    protocol_t* protocol, 
+    protocol_t* protocol,
     int device_id,
-    int stream_id, 
-    const char* name, 
-    int size, 
+    int stream_id,
+    const char* name,
+    int size,
     const char** labels);
 
 
 /*
 * Set device status with an optional message.
-* 
-* Note, When the device status is changed from 
-* DEVICE_STATUS_READY or DEVICE_STATUS_ERROR 
+*
+* Note, When the device status is changed from
+* DEVICE_STATUS_READY or DEVICE_STATUS_ERROR
 * to
-* DEVICE_STATUS_ACTIVE or DEVICE_ACTIVE_WAIT 
+* DEVICE_STATUS_ACTIVE or DEVICE_ACTIVE_WAIT
 * all the streams frame counters are cleared.
 *
 * @param protocol: A pointer to the protocol_t object.
 * @param device_id: The ID of the device.
 * @param status: The new status of the device.
 * @param message: An optional message associated with the status.
-* 
+*
 * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
 */
 int protocol_set_device_status(
@@ -709,16 +709,16 @@ int protocol_set_device_status(
 /*
 * Sends a DataChunk message on the given device/stream.
 * See protocol_write_payload_fn for more information.
-* 
+*
 * @param protocol: A pointer to the protocol_t object.
 * @param device: The ID of the device.
 * @param stream: The ID of the stream.
 * @param frame_count: The number of frames in the message.
-* @param frames_skipped: The number of frames skipped between the last sent chunk and this. Default 0. 
+* @param frames_skipped: The number of frames skipped between the last sent chunk and this. Default 0.
 *   The stream frame counter will be updated as: stream->current_frame += frame_count + frames_skipped
 * @param ostream: The output stream to send the message.
 * @param callback: The callback function to write the payload.
-* 
+*
 * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
 */
 int protocol_send_data_chunk(
@@ -750,11 +750,11 @@ int protocol_send_data_inquire(
 
 /*
 * Reads and processes a message from istream, any response is written to given ostream.
-* 
+*
 * @param protocol: A pointer to the protocol_t object.
 * @param istream: The input stream to read the message.
 * @param ostream: The output stream to write any response.
-* 
+*
 * @return PROTOCOL_STATUS_SUCCESS (0) on success, or a negative error code.
 */
 int protocol_process_request(protocol_t* protocol, pb_istream_t* istream, pb_ostream_t* ostream);
@@ -764,8 +764,10 @@ int protocol_process_request(protocol_t* protocol, pb_istream_t* istream, pb_ost
 *
 * @param protocol: A pointer to the protocol_t object.
 * @param ostream: The output stream to write any data.
+* 
+* @return the number of devices the poll function invoked.
 */
-void protocol_call_device_poll(protocol_t* protocol, pb_ostream_t* ostream);
+int protocol_call_device_poll(protocol_t* protocol, pb_ostream_t* ostream);
 
 /*
 * Sends an ErrorResponse message.
