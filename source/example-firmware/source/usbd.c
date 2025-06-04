@@ -140,6 +140,8 @@ usbd_t* usbd_create(protocol_t *protocol)
 * Summary:
 *   Reads data from the serial interface into the provided buffer.
 *   This is called by the protocol engine to receive commands.
+*   It returns once 'count' number of bytes are read. 
+*   While it is waiting for data it calls protocol_call_device_poll().
 *
 * Parameters:
 *   stream: Pointer to the input stream.
@@ -150,19 +152,6 @@ usbd_t* usbd_create(protocol_t *protocol)
 *   True if reading is successful, otherwise false.
 *
 *******************************************************************************/
-
-/*******************************************************************************
-* Some notes on this.
-* Through the protocol_process_request() in the loop in main.c this function will be called.
-* If there is a byte in the incoming buffer this function returns immediately.
-* If there is none the while loop blocks until the byte was sent from the host.
-* This is why we call protocol_call_device_poll() here to not lose sensor data while
-* waiting.
-* Once the protocol_process_request have got enough data it returns to main()
-* and is called immediately again and thus a new byte will be asked for. 
-* If the serial protocol would not be blocking, or we had a threaded application, we
-* could call protocol_call_device_poll() in our main loop instead.
-*******************************************************************************/
 static bool _usbd_read(pb_istream_t* stream, pb_byte_t* buf, size_t count)
 {
     if (count == 0)
@@ -172,18 +161,15 @@ static bool _usbd_read(pb_istream_t* stream, pb_byte_t* buf, size_t count)
 
     usbd_t *usb = (usbd_t*)stream->state;
 
+    /* Ask USB driver to write 'count' number of bytes in the background (this is non-blocking). */
     USBD_CDC_ReadOverlapped(usb->usb_cdcHandle, buf, count);
 
-    // Poll devices once, since USBD_CDC_GetNumBytesRemToRead() might block for a while.
-    // Note: protocol_call_device_poll will trigger data fetching from all started devices.
-    protocol_call_device_poll(usb->protocol, &usb->ostream);
-
-    /* Keep doing device polling while waiting for data. */
-    /* If the requested byte wasn't in the incoming buffer we just */
-    /* wait for it here and do the polling at the same time. */
-    while(USBD_CDC_GetNumBytesRemToRead(usb->usb_cdcHandle) > 0) {
+    /* While retrieving all the requested data, call protocol_call_device_poll(). */
+    /* This is needed as we might be waiting here for a long time waiting for new packages from the client. */
+    /* If we don't poll the devices here, we don't allow them to perform tasks and stream data.. */
+    do {
         protocol_call_device_poll(usb->protocol, &usb->ostream);
-    }
+    } while(USBD_CDC_GetNumBytesRemToRead(usb->usb_cdcHandle) > 0);
 
     return true;
 

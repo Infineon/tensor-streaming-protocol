@@ -144,15 +144,17 @@ int main(void)
 *   device is configured using the Studio interface the user can then start
 *   displaying and recording the data in Studio.
 *
-*   For every character the protocol is fetching or is trying to fetch from
-*   the in-stream there is a check for data ready done using the polling
-*   callback. If the incoming data completes as a command this will be 
-*   processed. Commands can be configuring, starting or stopping the device.
+*   protocol_process_request() reads and processes a complete package. 
+*   While waiting for packages this function calls protocol_call_device_poll() that 
+*   in turn reads/writes to/from devices and writes packages.
+*   This call happens in _usbd_read().
+*
+*   In short, this for-loop iterates one step for each incoming package, and while
+*   waiting for new packages, packages are continuously sent.
 *******************************************************************************/
     for (;;)
     {
         protocol_process_request(protocol, &usb->istream, &usb->ostream);
-        //protocol_call_device_poll() // If our transport layer would be non-blocking we could call this here instead of in usbd.c
     }
 }
 
