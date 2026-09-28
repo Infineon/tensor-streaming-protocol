@@ -1,3 +1,7 @@
+# This repository will be migrated to GitHub
+
+This repository has not been migrated yet.
+
 ﻿# Tensor Streaming Protocol
 
 Tensor Streaming Protocol defines a streaming mechanism used for communication between a client and a board. The protocol is intended to work over TCP, UDP, serial port, and Bluetooth communication.
