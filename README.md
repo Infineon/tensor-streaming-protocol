@@ -1,6 +1,8 @@
-# This repository will be migrated to GitHub
+# This repository has moved to GitHub
 
-This repository has not been migrated yet.
+https://github.com/Infineon/tensor-streaming-protocol
+
+The Bitbucket copy is no longer updated. Clone and open the GitHub project instead.
 
 ﻿# Tensor Streaming Protocol
 
